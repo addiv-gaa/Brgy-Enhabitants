@@ -1,4 +1,4 @@
-# BarangayKo (BrgyKo) — Complete Hosting, Setup & Dependencies Guide
+# Brgy-Enhabitants (Brgy-Enhabitants) — Complete Hosting, Setup & Dependencies Guide
 
 > **System**: Barangay E-nhabitants Management Information System (BrgyKo)  
 > **Jurisdiction**: Barangay San Gabriel, General Trias, Cavite  
