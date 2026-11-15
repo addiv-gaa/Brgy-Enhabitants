@@ -1,8 +1,6 @@
 import { createContext, useState, useEffect, type ReactNode } from 'react';
 import api from '../api';
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 interface User {
     roles: string[];
     role?: string;
@@ -18,7 +16,6 @@ interface SystemSettings {
     barangay_hall_address: string;
     official_contact_email: string;
     official_contact_number: string;
-    barangay_seal_url: string;
     emergency_hotline: string;
     police_hotline: string;
     fire_hotline: string;
@@ -56,13 +53,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchSettings = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/system/settings/`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data.barangay_seal_url && (data.barangay_seal_url.trim().toLowerCase() === 'null' || data.barangay_seal_url.trim().toLowerCase() === 'undefined')) {
-                    data.barangay_seal_url = '';
-                }
-                setSettings(data);
+            const res = await api.get('/api/system/settings/');
+            if (res.data) {
+                setSettings(res.data);
             }
         } catch (error) {
             console.error("Failed to fetch system settings", error);

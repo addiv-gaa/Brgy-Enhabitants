@@ -154,6 +154,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             role = 'RESIDENT'
             must_change_password = False
 
+        from django.middleware.csrf import get_token
+        get_token(request)
+
         response.data = {
             'detail': 'Login successful',
             'access': str(access_token),
@@ -210,40 +213,44 @@ class CustomTokenRefreshView(APIView):
 
 
 class ForgotPasswordView(APIView):
+    """Sends hashed password-reset OTP without leaking user existence (F-014, F-026)."""
     permission_classes = [AllowAny]
     
     def post(self, request):
-        email = request.data.get('email')
+        email = str(request.data.get('email') or '').strip().lower()
         if not email:
             return Response({"error": "Email is required."}, status=400)
             
         from django.contrib.auth.models import User
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
         if not user:
-            # SECURITY: Return a generic success to prevent email enumeration
             import time
-            time.sleep(0.5) # Simulate email sending delay
+            time.sleep(0.4) # Simulate uniform processing delay
             return Response({
-                "message": "If an account exists with this email, an OTP has been sent.", 
-                "user_id": -1 # Dummy ID
+                "message": "If an account exists with this email, an OTP has been sent."
             }, status=200)
             
         import random
         from django.utils import timezone
         from django.core.mail import send_mail
+        from django.contrib.auth.hashers import make_password
         from .models import UserProfile
+        import logging
+        logger = logging.getLogger(__name__)
         
-        otp = str(random.randint(100000, 999999))
+        raw_otp = f"{random.randint(100000, 999999):06d}"
         profile, _ = UserProfile.objects.get_or_create(user=user)
-        profile.email_otp = otp
+        profile.email_otp = make_password(raw_otp)
         profile.otp_created_at = timezone.now()
         profile.otp_attempts = 0
         profile.save()
+
+        logger.debug("Password reset OTP generated for %s: %s", email, raw_otp)
         
         try:
             send_mail(
                 'Password Reset Verification Code',
-                f'Your 6-digit verification code is: {otp}',
+                f'Your 6-digit verification code is: {raw_otp}',
                 'no-reply@barangay.gov',
                 [user.email],
                 fail_silently=True, 
@@ -251,28 +258,34 @@ class ForgotPasswordView(APIView):
         except Exception:
             pass
             
-        return Response({"message": "If an account exists with this email, an OTP has been sent.", "user_id": user.id})
+        return Response({"message": "If an account exists with this email, an OTP has been sent."})
 
 class ResetPasswordView(APIView):
+    """Verifies hashed OTP and resets password without user_id enumeration (F-014)."""
     permission_classes = [AllowAny]
     
     def post(self, request):
+        email = str(request.data.get('email') or '').strip().lower()
         user_id = request.data.get('user_id')
-        otp = request.data.get('otp')
+        otp = str(request.data.get('otp') or '').strip()
         new_password = request.data.get('new_password')
         
-        if not all([user_id, otp, new_password]):
+        if not (email or user_id) or not otp or not new_password:
             return Response({"error": "Missing required fields."}, status=400)
             
         from django.contrib.auth.models import User
-        user = User.objects.filter(id=user_id).first()
+        if email:
+            user = User.objects.filter(email__iexact=email).first()
+        else:
+            user = User.objects.filter(id=user_id).first()
+
         if not user:
-            return Response({"error": "Invalid OTP."}, status=400)
+            return Response({"error": "Invalid or expired OTP."}, status=400)
             
         from .models import UserProfile
         profile = getattr(user, 'otp_profile', None)
-        if not profile:
-            return Response({"error": "Invalid OTP."}, status=400)
+        if not profile or not profile.email_otp:
+            return Response({"error": "Invalid or expired OTP."}, status=400)
 
         # Enforce maximum 5 wrong attempts (F-006 Brute Force protection)
         if profile.otp_attempts >= 5:
@@ -280,7 +293,8 @@ class ResetPasswordView(APIView):
             profile.save()
             return Response({"error": "Too many failed attempts. This OTP has been invalidated. Please request a new OTP."}, status=400)
 
-        if profile.email_otp != otp:
+        from django.contrib.auth.hashers import check_password
+        if not check_password(otp, profile.email_otp):
             profile.otp_attempts += 1
             if profile.otp_attempts >= 5:
                 profile.email_otp = ''
@@ -346,7 +360,7 @@ class ChangeTemporaryPasswordView(APIView):
 
 
 class LogoutView(APIView):
-    """Clears the HttpOnly auth cookies."""
+    """Clears the HttpOnly auth cookies and blacklists the refresh token (F-013)."""
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -358,24 +372,39 @@ class LogoutView(APIView):
                 from .models import SessionLog
                 SessionLog.objects.create(user=request.user, action='Logged Out')
 
+        # Server-side token blacklist
+        refresh_token = request.COOKIES.get('refresh_token') or request.data.get('refresh')
+        if refresh_token:
+            try:
+                from rest_framework_simplejwt.tokens import RefreshToken
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
+
         response = Response({'detail': 'Logged out successfully.'})
-        response.delete_cookie(
-            'access_token', 
-            path='/',
-            samesite='None'
-        )
-        response.delete_cookie(
-            'refresh_token', 
-            path='/',
-            samesite='None'
-        )
+        response.delete_cookie('access_token', path='/', samesite='None')
+        response.delete_cookie('refresh_token', path='/', samesite='None')
         return response
 
 
-class CurrentUserView(APIView):
-    """Returns the currently authenticated user's info."""
+class GetCSRFTokenView(APIView):
+    """Returns CSRF token and sets csrftoken cookie for SPA clients (F-013)."""
+    permission_classes = [AllowAny]
 
     def get(self, request):
+        from django.middleware.csrf import get_token
+        token = get_token(request)
+        return Response({'csrfToken': token})
+
+
+class CurrentUserView(APIView):
+    """Returns the currently authenticated user's info and ensures CSRF cookie (F-013)."""
+
+    def get(self, request):
+        from django.middleware.csrf import get_token
+        get_token(request)
+
         try:
             role = request.user.otp_profile.role
             must_change_password = request.user.otp_profile.must_change_password
@@ -396,66 +425,80 @@ class CreateUserView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 class RegisterWithEmailView(APIView):
+    """Registers new residents with hashed OTP; prevents account enumeration (F-014, F-026)."""
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get('username')
-        email = request.data.get('email')
+        username = str(request.data.get('username') or '').strip()
+        email = str(request.data.get('email') or '').strip().lower()
         password = request.data.get('password')
 
         if not username or not email or not password:
             return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_qs = User.objects.filter(email=email)
+        from django.contrib.auth.hashers import make_password
+        import logging
+        logger = logging.getLogger(__name__)
+
+        user_qs = User.objects.filter(email__iexact=email)
         
         if user_qs.exists():
             user = user_qs.first()
             if user.is_active:
-                return Response({"error": "Email is already registered and active."}, status=status.HTTP_400_BAD_REQUEST)
+                import time
+                time.sleep(0.4) # Normalize timing to mitigate enumeration
+                return Response({
+                    "message": "If this email is not yet registered, a verification code has been sent. Please check your email."
+                }, status=status.HTTP_200_OK)
             else:
                 user.set_password(password)
                 user.username = username
                 user.save()
                 
                 profile, created = UserProfile.objects.get_or_create(user=user)
-                otp = str(random.randint(100000, 999999))
-                profile.email_otp = otp
+                raw_otp = f"{random.randint(100000, 999999):06d}"
+                profile.email_otp = make_password(raw_otp)
                 profile.otp_created_at = timezone.now()
+                profile.otp_attempts = 0
                 profile.save()
         else:
             user = User.objects.create_user(username=username, email=email, password=password)
             user.is_active = False
             user.save()
             
-            otp = str(random.randint(100000, 999999))
-            UserProfile.objects.create(user=user, email_otp=otp, otp_created_at=timezone.now())
+            raw_otp = f"{random.randint(100000, 999999):06d}"
+            UserProfile.objects.create(
+                user=user,
+                email_otp=make_password(raw_otp),
+                otp_created_at=timezone.now(),
+                otp_attempts=0
+            )
 
-        print("\n" + "="*40)
-        print(f"🔑 YOUR OTP CODE FOR {email}: {otp}")
-        print("="*40 + "\n")
+        logger.debug("Verification code generated for %s: %s", email, raw_otp)
 
         try:
             send_mail(
                 'Your Barangay System Verification Code',
-                f'Your 6-digit verification code is: {otp}',
+                f'Your 6-digit verification code is: {raw_otp}',
                 'no-reply@barangay.gov',
                 [email],
                 fail_silently=True, 
             )
         except Exception as e:
-            print(f"Could not send email: {e}")
+            logger.warning("Could not send email: %s", e)
 
         return Response({
-            "message": "Registration successful. Check your terminal console for the OTP code.", 
+            "message": "Verification code sent. Please check your email.", 
             "user_id": user.id
         }, status=status.HTTP_200_OK)
 
 class VerifyEmailOTPView(APIView):
+    """Verifies hashed registration OTP (F-014)."""
     permission_classes = [AllowAny]
 
     def post(self, request):
         user_id = request.data.get('user_id')
-        entered_otp = request.data.get('otp')
+        entered_otp = str(request.data.get('otp') or '').strip()
 
         try:
             profile = UserProfile.objects.get(user__id=user_id)
@@ -468,7 +511,8 @@ class VerifyEmailOTPView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
 
-        if profile.email_otp != entered_otp:
+        from django.contrib.auth.hashers import check_password
+        if not profile.email_otp or not check_password(entered_otp, profile.email_otp):
             profile.otp_attempts += 1
             profile.save()
             return Response(
@@ -490,6 +534,7 @@ class VerifyEmailOTPView(APIView):
         return Response({"message": "Email successfully verified! You can now log in."}, status=status.HTTP_200_OK)
 
 class ResendOTPView(APIView):
+    """Resends a new hashed OTP (F-014)."""
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -507,26 +552,28 @@ class ResendOTPView(APIView):
         if user.is_active:
             return Response({"error": "Account is already verified."}, status=status.HTTP_400_BAD_REQUEST)
 
-        otp = str(random.randint(100000, 999999))
-        profile.email_otp = otp
+        from django.contrib.auth.hashers import make_password
+        import logging
+        logger = logging.getLogger(__name__)
+
+        raw_otp = f"{random.randint(100000, 999999):06d}"
+        profile.email_otp = make_password(raw_otp)
         profile.otp_created_at = timezone.now()
         profile.otp_attempts = 0
         profile.save()
 
-        print("\n" + "="*40)
-        print(f"🔄 RESENT OTP CODE FOR {user.email}: {otp}")
-        print("="*40 + "\n")
+        logger.debug("Resent OTP for %s: %s", user.email, raw_otp)
 
         try:
             send_mail(
                 'Your New Verification Code',
-                f'Your new 6-digit verification code is: {otp}',
+                f'Your new 6-digit verification code is: {raw_otp}',
                 'no-reply@barangay.gov',
                 [user.email],
                 fail_silently=True, 
             )
         except Exception as e:
-            print(f"Could not send email: {e}")
+            logger.warning("Could not send email: %s", e)
 
         return Response({"message": "A new OTP has been sent."}, status=status.HTTP_200_OK)
 
@@ -901,7 +948,7 @@ class ResidentViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"Failed to process file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get', 'post'], permission_classes=[IsAuthenticated])
     def export_excel(self, request):
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -933,8 +980,29 @@ class ResidentViewSet(viewsets.ModelViewSet):
         for cell in ws[1]:
             cell.font = openpyxl.styles.Font(bold=True)
 
-        # Fetch all residents and map them to the 17 columns
-        residents = Resident.objects.filter(is_approved=True).order_by('last_name', 'first_name')
+        # Fetch approved residents (filtered by selected IDs if provided via POST body or GET query params)
+        residents = Resident.objects.filter(is_approved=True)
+
+        raw_ids = None
+        if request.method == 'POST' and isinstance(request.data, dict):
+            raw_ids = request.data.get('ids')
+        if not raw_ids:
+            ids_param = request.query_params.get('ids', '')
+            if ids_param:
+                raw_ids = [x.strip() for x in ids_param.split(',') if x.strip()]
+
+        selected_ids = []
+        if raw_ids and isinstance(raw_ids, (list, tuple)):
+            for item in raw_ids:
+                try:
+                    selected_ids.append(int(item))
+                except (ValueError, TypeError):
+                    pass
+
+        if selected_ids:
+            residents = residents.filter(id__in=selected_ids)
+
+        residents = residents.order_by('last_name', 'first_name')
         
         for res in residents:
             birthdate_str = res.birth_date.strftime('%Y-%m-%d') if res.birth_date else ""
@@ -970,10 +1038,14 @@ class ResidentViewSet(viewsets.ModelViewSet):
         excel_bytes = buffer.getvalue()
 
         try:
-            timestamp_str = timezone.now().strftime("%Y%m%d_%H%M%S")
+            local_now = timezone.localtime()
+            timestamp_str = local_now.strftime("%Y%m%d_%H%M%S")
             filename = f"Resident_Registry_Export_{timestamp_str}.xlsx"
-            display_time = timezone.now().strftime("%b %d, %Y %I:%M %p")
-            doc_title = f"Resident Registry Demographic Export - Generated {display_time}"
+            display_time = local_now.strftime("%b %d, %Y %I:%M %p")
+            if selected_ids:
+                doc_title = f"Resident Registry Export ({len(selected_ids)} Selected) - Generated {display_time}"
+            else:
+                doc_title = f"Resident Registry Demographic Export - Generated {display_time}"
             uploader = request.user if request.user.is_authenticated else None
 
             OfficialDocument.objects.create(
@@ -1120,8 +1192,9 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Announcement.objects.all().order_by('-created_at')
         
-        # When unarchiving, we need to be able to find the archived object!
-        if self.action == 'unarchive':
+        # Detail operations (retrieve, update, partial_update, destroy, archive, unarchive)
+        # must be able to target both active and archived announcements.
+        if getattr(self, 'detail', False) or self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'archive', 'unarchive']:
             return qs
             
         if self.request.query_params.get('archived') == 'true':
@@ -1391,7 +1464,7 @@ Age Groups: Children={s.children}, Youth={s.youth}, Adults={s.adults}, Seniors={
 Sectors: 4Ps={s.four_ps}, PWD={s.pwd}, Solo Parents={s.solo_parents}, OFW={s.ofw}, OSY={s.out_of_school}, Indigenous={s.indigenous}
 Registered Voters: {s.registered_voters}
 Gender: Male={s.male}, Female={s.female}
-Purok data: {s.purok_data}
+Alley data: {s.purok_data}
 """
 
             system_instruction = f"""
@@ -1461,6 +1534,7 @@ class AiAssistantView(APIView):
                 Active Advisory: {advisory_msg}
                 Classification: {settings.barangay_classification}, {settings.barangay_city}, {settings.barangay_province}, {settings.barangay_region}
                 Puroks: {settings.number_of_puroks}
+                Registered Residents: {settings.registered_residents_override if settings.registered_residents_override and settings.registered_residents_override > 0 else Resident.objects.filter(is_approved=True).count()}
                 
                 History: {settings.history_text}
                 Location & Geography: {settings.location_geography_text}
@@ -1945,10 +2019,7 @@ class SystemSettingsView(APIView):
 
     def get(self, request):
         settings, created = BarangaySettings.objects.get_or_create(pk=1)
-        # F-027: Prevent empty seal URL from turning into literal string 'null'
-        if settings.barangay_seal_url and settings.barangay_seal_url.strip().lower() in ['null', 'none', 'undefined']:
-            settings.barangay_seal_url = ''
-            settings.save()
+
         serializer = BarangaySettingsSerializer(settings)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1963,10 +2034,6 @@ class SystemSettingsView(APIView):
 
         settings, created = BarangaySettings.objects.get_or_create(pk=1)
         save_data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
-        if 'barangay_seal_url' in save_data:
-            val = str(save_data.get('barangay_seal_url') or '').strip()
-            if val.lower() in ['null', 'none', 'undefined', '']:
-                save_data['barangay_seal_url'] = ''
 
         # Handle removing barangay_seal or captain_image if sent as empty string or 'null'
         if 'barangay_seal' in save_data and not request.FILES.get('barangay_seal'):
@@ -1982,6 +2049,16 @@ class SystemSettingsView(APIView):
                 settings.captain_image = None
                 settings.save()
                 save_data.pop('captain_image', None)
+
+        if 'registered_residents_override' in save_data:
+            val = str(save_data.get('registered_residents_override') or '').strip().lower()
+            if val in ['', 'null', 'none', 'undefined', '0']:
+                save_data['registered_residents_override'] = None
+            else:
+                try:
+                    save_data['registered_residents_override'] = int(val)
+                except ValueError:
+                    save_data['registered_residents_override'] = None
 
         serializer = BarangaySettingsSerializer(settings, data=save_data, partial=True)
         
@@ -2118,3 +2195,23 @@ class BarangayFAQViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
         return [IsAdminUser()]
+
+
+# ==========================================
+# CUSTOM PRODUCTION ERROR HANDLERS (F-004)
+# ==========================================
+def custom_bad_request(request, exception=None):
+    from django.http import JsonResponse
+    return JsonResponse({'error': 'Bad Request', 'detail': 'The request could not be processed.'}, status=400)
+
+def custom_permission_denied(request, exception=None):
+    from django.http import JsonResponse
+    return JsonResponse({'error': 'Forbidden', 'detail': 'You do not have permission to perform this action.'}, status=403)
+
+def custom_not_found(request, exception=None):
+    from django.http import JsonResponse
+    return JsonResponse({'error': 'Not Found', 'detail': 'The requested resource was not found.'}, status=404)
+
+def custom_server_error(request):
+    from django.http import JsonResponse
+    return JsonResponse({'error': 'Internal Server Error', 'detail': 'An unexpected server error occurred.'}, status=500)

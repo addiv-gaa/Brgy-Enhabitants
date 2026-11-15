@@ -1,15 +1,13 @@
 import { useState, useEffect, useContext } from 'react';
 import { AlertTriangle, Save, Home, UserMinus } from 'lucide-react';
 import { AuthContext } from '../components/AuthContext';
+import api from '../api';
 import { MapContainer, TileLayer, Marker, useMapEvents, LayersControl } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import HouseholdModal, { type HouseholdSaveData } from '../components/HouseholdModal';
 import AssignResidentModal from '../components/AssignResidentModal';
 import ResidentModal, { type ResidentProperties } from '../components/ResidentModal';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 // --- Types ---
 interface ResidentMini {
@@ -69,37 +67,16 @@ const getMarkerColor = (props: HouseholdProperties) => {
     return 'bg-emerald-500 border-emerald-700';                                          
 };
 
-const createCustomIcon = (props: HouseholdProperties) => {
+const createCustomIcon = (props: HouseholdProperties, isSelected = false) => {
     const colorClasses = getMarkerColor(props);
+    const selectionClasses = isSelected
+        ? 'ring-4 ring-emerald-400 ring-offset-2 scale-125 shadow-xl animate-pulse z-[1000]'
+        : 'hover:scale-110 shadow-md';
     return L.divIcon({
         className: 'custom-icon',
-        html: `<div class="w-4 h-4 rounded-full border-2 border-white shadow-md ${colorClasses}"></div>`,
+        html: `<div class="w-4 h-4 rounded-full border-2 border-white transition-all duration-150 ${colorClasses} ${selectionClasses}"></div>`,
         iconSize: [16, 16],
         iconAnchor: [8, 8]
-    });
-};
-
-
-const createClusterCustomIcon = function (cluster: any) {
-    const count = cluster.getChildCount();
-    let size = 'h-10 w-10';
-    let border = 'border-4 border-emerald-200/50';
-    let text = 'text-sm';
-    
-    if (count > 50) {
-        size = 'h-14 w-14';
-        border = 'border-[6px] border-emerald-200/50';
-        text = 'text-lg';
-    } else if (count > 20) {
-        size = 'h-12 w-12';
-        border = 'border-[5px] border-emerald-200/50';
-        text = 'text-base';
-    }
-    
-    return L.divIcon({
-        html: `<div class="bg-emerald-600 text-white font-bold ${text} rounded-full ${size} flex items-center justify-center ${border} shadow-lg ring-2 ring-emerald-600 ring-offset-1">${count}</div>`,
-        className: 'custom-marker-cluster',
-        iconSize: L.point(count > 50 ? 56 : (count > 20 ? 48 : 40), count > 50 ? 56 : (count > 20 ? 48 : 40), true),
     });
 };
 
@@ -136,34 +113,36 @@ export default function MappingPage() {
 
     const auth = useContext(AuthContext);
     const userRole = auth?.user?.role || (auth?.user?.roles && auth?.user?.roles[0]) || '';
-    const canEdit = userRole.toUpperCase() === 'ADMIN';
+    const canEdit = ['ADMIN', 'STAFF', 'CAPTAIN'].includes(userRole.toUpperCase());
 
     // F-028: Extract friendly error messages instead of raw text
-    const getFriendlyError = async (res: Response, fallback: string) => {
-        try {
-            const data = await res.json();
-            return data?.error || data?.detail || 
-                (typeof data === 'object' && Object.values(data)[0] ? (Array.isArray(Object.values(data)[0]) ? (Object.values(data)[0] as string[])[0] : Object.values(data)[0]) : null) || 
-                fallback;
-        } catch {
-            return fallback;
+    const getFriendlyError = (error: any, fallback: string) => {
+        const data = error?.response?.data;
+        if (!data) return error?.message || fallback;
+        if (typeof data === 'string') return data;
+        if (data.error) return data.error;
+        if (data.detail) return data.detail;
+        if (typeof data === 'object') {
+            const firstVal = Object.values(data)[0];
+            if (Array.isArray(firstVal)) return firstVal[0];
+            if (typeof firstVal === 'string') return firstVal;
         }
+        return fallback;
     };
 
     const fetchHouseholds = async (query = '') => {
         try {
             const url = query 
-                ? `${API_URL}/api/households/?search=${encodeURIComponent(query)}` 
-                : `${API_URL}/api/households/`;
+                ? `/api/households/?search=${encodeURIComponent(query)}` 
+                : `/api/households/`;
 
-            const response = await fetch(url, { credentials: 'include' });
+            const response = await api.get(url);
             
-            if (response.ok) {
-                const data = await response.json();
-                setHouseholds(data.features || []);
+            if (response.data) {
+                setHouseholds(response.data.features || []);
                 
                 if (selectedHousehold) {
-                    const updatedSelected = (data.features || []).find(
+                    const updatedSelected = (response.data.features || []).find(
                         (f: GeoJSONFeature) => f.id === selectedHousehold.id
                     );
                     if (updatedSelected) setSelectedHousehold(updatedSelected);
@@ -183,10 +162,9 @@ export default function MappingPage() {
 
     const handleEditResidentClick = async (residentId: number) => {
         try {
-            const res = await fetch(`${API_URL}/api/residents/${residentId}/`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setEditingResident(data);
+            const res = await api.get(`/api/residents/${residentId}/`);
+            if (res.data) {
+                setEditingResident(res.data);
                 setIsResidentEditOpen(true);
             }
         } catch (error) {
@@ -197,28 +175,17 @@ export default function MappingPage() {
     const executeSaveResidentInfo = async () => {
         if (!editingResident || !pendingResidentData) return;
         try {
-            const url = `${API_URL}/api/residents/${editingResident.id}/`;
-            const response = await fetch(url, {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(pendingResidentData)
-            });
-            if (response.ok) {
-                setIsResidentEditOpen(false);
-                setIsConfirmingResidentSave(false);
-                setEditingResident(null);
-                setPendingResidentData(null);
-                fetchHouseholds(searchQuery); 
-            } else {
-                const msg = await getFriendlyError(response, "Failed to save resident updates.");
-                alert(msg);
-                setIsConfirmingResidentSave(false);
-            }
-        } catch (error) {
+            const url = `/api/residents/${editingResident.id}/`;
+            await api.put(url, pendingResidentData);
+            setIsResidentEditOpen(false);
+            setIsConfirmingResidentSave(false);
+            setEditingResident(null);
+            setPendingResidentData(null);
+            fetchHouseholds(searchQuery); 
+        } catch (error: any) {
             console.error("Failed to save resident", error);
+            const msg = getFriendlyError(error, "Failed to save resident updates.");
+            alert(msg);
             setIsConfirmingResidentSave(false);
         }
     };
@@ -227,13 +194,7 @@ export default function MappingPage() {
         if (!pendingHouseholdData) return;
         const formData = pendingHouseholdData;
         try {
-            const method = modalMode === 'edit' ? 'PUT' : 'POST';
             const householdId = selectedHousehold?.id || selectedHousehold?.properties?.id;
-            
-            const url = modalMode === 'edit' 
-                ? `${API_URL}/api/households/${householdId}/` 
-                : `${API_URL}/api/households/`;
-            
             const payload = {
                 type: "Feature",
                 geometry: {
@@ -245,29 +206,22 @@ export default function MappingPage() {
                 properties: formData
             };
 
-            const response = await fetch(url, {
-                method: method,
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.ok) {
-                setIsModalOpen(false);
-                setIsConfirmingSave(false);
-                setPendingHouseholdData(null);
-                setPendingCoords(null);
-                if (modalMode === 'add') setSelectedHousehold(null);
-                fetchHouseholds(searchQuery); 
+            if (modalMode === 'edit') {
+                await api.put(`/api/households/${householdId}/`, payload);
             } else {
-                const msg = await getFriendlyError(response, "Failed to save household.");
-                alert(msg);
-                setIsConfirmingSave(false);
+                await api.post(`/api/households/`, payload);
             }
-        } catch (error) {
+
+            setIsModalOpen(false);
+            setIsConfirmingSave(false);
+            setPendingHouseholdData(null);
+            setPendingCoords(null);
+            if (modalMode === 'add') setSelectedHousehold(null);
+            fetchHouseholds(searchQuery); 
+        } catch (error: any) {
             console.error("Network error saving household:", error);
+            const msg = getFriendlyError(error, "Failed to save household.");
+            alert(msg);
             setIsConfirmingSave(false);
         }
     };
@@ -275,22 +229,14 @@ export default function MappingPage() {
     const executeDeleteHousehold = async () => {
         if (!householdToDelete) return;
         try {
-            const response = await fetch(`${API_URL}/api/households/${householdToDelete}/`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (response.ok || response.status === 204) {
-                setSelectedHousehold(null);
-                setHouseholdToDelete(null);
-                fetchHouseholds(searchQuery);
-            } else {
-                const msg = await getFriendlyError(response, "Failed to delete structure.");
-                alert(msg);
-                setHouseholdToDelete(null);
-            }
-        } catch (error) {
+            await api.delete(`/api/households/${householdToDelete}/`);
+            setSelectedHousehold(null);
+            setHouseholdToDelete(null);
+            fetchHouseholds(searchQuery);
+        } catch (error: any) {
             console.error("Error deleting structure:", error);
+            const msg = getFriendlyError(error, "Failed to delete structure.");
+            alert(msg);
             setHouseholdToDelete(null);
         }
     };
@@ -298,34 +244,24 @@ export default function MappingPage() {
     const executeRemoveResident = async () => {
         if (!residentToRemove) return;
         try {
-            const response = await fetch(`${API_URL}/api/residents/${residentToRemove.id}/`, {
-                method: 'PATCH',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ household: null })
-            });
-
-            if (response.ok) {
-                setResidentToRemove(null);
-                fetchHouseholds(searchQuery);
-                if (selectedHousehold) {
-                    const updatedResidents = selectedHousehold.properties.residents.filter((r: any) => r.id !== residentToRemove.id);
-                    setSelectedHousehold({
-                        ...selectedHousehold,
-                        properties: {
-                            ...selectedHousehold.properties,
-                            residents: updatedResidents,
-                            member_count: selectedHousehold.properties.member_count - 1
-                        }
-                    });
-                }
-            } else {
-                const msg = await getFriendlyError(response, "Failed to remove resident from household.");
-                alert(msg);
-                setResidentToRemove(null);
+            await api.patch(`/api/residents/${residentToRemove.id}/`, { household: null });
+            setResidentToRemove(null);
+            fetchHouseholds(searchQuery);
+            if (selectedHousehold) {
+                const updatedResidents = selectedHousehold.properties.residents.filter((r: any) => r.id !== residentToRemove.id);
+                setSelectedHousehold({
+                    ...selectedHousehold,
+                    properties: {
+                        ...selectedHousehold.properties,
+                        residents: updatedResidents,
+                        member_count: selectedHousehold.properties.member_count - 1
+                    }
+                });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error removing resident:", error);
+            const msg = getFriendlyError(error, "Failed to remove resident from household.");
+            alert(msg);
             setResidentToRemove(null);
         }
     };
@@ -424,39 +360,42 @@ export default function MappingPage() {
                         </div>
                     </div>
 
-                    <div className="flex-1 flex overflow-hidden relative rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex-1 min-h-[460px] sm:min-h-[550px] lg:min-h-[600px] flex overflow-hidden relative rounded-xl shadow-sm border border-gray-200">
                         {/* MAP AREA */}
                         <div className={`flex-1 relative transition-all duration-300 bg-gray-100 ${isAddMode ? 'cursor-crosshair' : ''}`}>
-                            <MapContainer center={[14.384, 120.886]} zoom={15} className="h-full w-full z-0 relative">
+                            <MapContainer center={[14.384, 120.886]} zoom={15} maxZoom={22} className="h-full w-full z-0 relative">
                                 <LayersControl position="topright">
                                     <LayersControl.BaseLayer checked name="Street View">
                                         <TileLayer 
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
                                             attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                                            maxZoom={22}
+                                            maxNativeZoom={19}
                                         />
                                     </LayersControl.BaseLayer>
                                     <LayersControl.BaseLayer name="Satellite View">
                                         <TileLayer 
                                             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" 
                                             attribution="Tiles &copy; Esri"
+                                            maxZoom={22}
+                                            maxNativeZoom={18}
                                         />
                                     </LayersControl.BaseLayer>
                                 </LayersControl>
                                 <MapClickHandler />
                                 
-                                <MarkerClusterGroup chunkedLoading maxClusterRadius={60} iconCreateFunction={createClusterCustomIcon}>
-                                    {filteredHouseholds.map((feature) => {
-                                        const keyId = feature.id || feature.properties?.id || Math.random();
-                                        return (
-                                            <Marker 
-                                                key={keyId}
-                                                position={[feature.geometry.coordinates[1], feature.geometry.coordinates[0]]}
-                                                icon={createCustomIcon(feature.properties)}
-                                                eventHandlers={{ click: () => setSelectedHousehold(feature) }}
-                                            />
-                                        );
-                                    })}
-                                </MarkerClusterGroup>
+                                {filteredHouseholds.map((feature) => {
+                                    const keyId = feature.id || feature.properties?.id || Math.random();
+                                    const isSelected = selectedHousehold?.id === feature.id;
+                                    return (
+                                        <Marker 
+                                            key={keyId}
+                                            position={[feature.geometry.coordinates[1], feature.geometry.coordinates[0]]}
+                                            icon={createCustomIcon(feature.properties, isSelected)}
+                                            eventHandlers={{ click: () => setSelectedHousehold(feature) }}
+                                        />
+                                    );
+                                })}
                             </MapContainer>
                             
                             {/* MAP LEGEND */}

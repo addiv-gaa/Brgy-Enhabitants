@@ -15,10 +15,9 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
@@ -30,7 +29,19 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+LEAKED_COMPROMISED_KEYS = [
+    'django-insecure-0al7y^id2f3inx!vbho#z$%5=7b!iacy7g2bf9gccrcs#eia7w',
+]
+
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY or SECRET_KEY in LEAKED_COMPROMISED_KEYS or (SECRET_KEY.startswith('django-insecure-') and not os.environ.get('DJANGO_DEBUG', 'True').lower() in ['true', '1']):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("CRITICAL: Insecure or published DJANGO_SECRET_KEY detected. System startup aborted.")
+
+JWT_SIGNING_KEY = os.environ.get('JWT_SIGNING_KEY', SECRET_KEY)
+if not JWT_SIGNING_KEY or JWT_SIGNING_KEY in LEAKED_COMPROMISED_KEYS:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("CRITICAL: Compromised JWT_SIGNING_KEY detected. System startup aborted.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ['true', '1']
@@ -42,10 +53,16 @@ ALLOWED_HOSTS = ['*'] if DEBUG else [
     ).split(',') if h.strip()
 ]
 
-# Security Headers (OWASP ASVS / DPA Sec 20)
+# Security Headers (OWASP ASVS / DPA Sec 20, F-025)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 
 REST_FRAMEWORK = {
@@ -65,6 +82,10 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "SIGNING_KEY": JWT_SIGNING_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 
@@ -79,6 +100,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'api',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'rest_framework_gis',
     'django.contrib.gis',
@@ -88,6 +110,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'api.middleware.SecurityHeadersMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -177,10 +200,18 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://intake-classifieds-potatoes-accidents.trycloudflare.com"
+    "https://luggage-salmon-prevention-treating.trycloudflare.com",
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.trycloudflare\.com$",
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
 ]
 CSRF_TRUSTED_ORIGINS = [
-    "https://intake-classifieds-potatoes-accidents.trycloudflare.com"
+    "https://*.trycloudflare.com",
+    "https://luggage-salmon-prevention-treating.trycloudflare.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")

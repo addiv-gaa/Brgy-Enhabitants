@@ -51,33 +51,33 @@ const PageHeader = ({ toggleSidebar }: { toggleSidebar?: () => void }) => {
     const isLoggedIn = !!auth?.user;
 
     return (
-        <header className="h-16 w-full bg-white flex items-center justify-between px-6 sticky top-0 shrink-0 z-50 border-b border-gray-200 shadow-sm">
+        <header className="h-16 w-full bg-white flex items-center justify-between px-3 sm:px-6 sticky top-0 shrink-0 z-50 border-b border-gray-200 shadow-sm">
             
             {/* Left Side: Hamburger & Title */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 pr-2">
                 <button 
                     onClick={toggleSidebar} 
                     aria-label="Toggle navigation menu"
-                    className="p-1 hover:bg-gray-100 rounded text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-600"
+                    className="p-2 -ml-1 sm:ml-0 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-600 shrink-0 min-h-[40px] min-w-[40px] flex items-center justify-center"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
                 <div className="flex flex-col min-w-0">
-                    <h1 className="text-sm font-bold text-gray-900 leading-tight">{currentTitle}</h1>
-                    <p className="text-[11px] text-gray-500 leading-tight truncate">
+                    <h1 className="text-xs sm:text-sm font-bold text-gray-900 leading-tight truncate">{currentTitle}</h1>
+                    <p className="text-[10px] sm:text-[11px] text-gray-500 leading-tight truncate max-w-[150px] sm:max-w-xs md:max-w-md">
                         {settings?.barangay_name || 'Barangay'} — {settings?.barangay_city || 'City of General Trias'}, {settings?.barangay_province || 'Cavite'}
                     </p>
                 </div>
             </div>
             
             {/* Right Side: Auth Button */}
-            <div className="flex items-center">
+            <div className="flex items-center shrink-0">
                 {isLoggedIn ? (
                     <button 
                         onClick={() => setIsConfirmingLogout(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md text-xs font-semibold hover:bg-red-100 transition-colors"
+                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md text-xs font-semibold hover:bg-red-100 transition-colors min-h-[36px]"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -87,7 +87,7 @@ const PageHeader = ({ toggleSidebar }: { toggleSidebar?: () => void }) => {
                 ) : (
                     <button 
                         onClick={() => navigate('/login')}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md text-xs font-semibold hover:bg-green-100 transition-colors"
+                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md text-xs font-semibold hover:bg-green-100 transition-colors min-h-[36px]"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />

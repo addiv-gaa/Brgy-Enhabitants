@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, [location.pathname]);
 
     return (
-        <div className="h-screen w-full flex bg-gray-100 overflow-hidden text-gray-800 relative">
+        <div className="h-[100dvh] w-full flex bg-gray-100 overflow-hidden text-gray-800 relative">
             {/* Mobile/Tablet Backdrop Overlay */}
             {isSidebarOpen && (
                 <div 
@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {settings?.show_advisory_banner && settings.advisory_banner_text && (
                     <div className="bg-amber-600 text-white text-xs sm:text-sm font-semibold shadow-md z-40 border-b border-amber-700 shrink-0 flex items-center h-9 sm:h-10 overflow-hidden relative select-none">
                         {/* Fixed Badge on the Left */}
-                        <div className="bg-amber-800 text-amber-100 uppercase text-[10px] sm:text-xs font-black px-3 py-1 sm:py-1.5 tracking-wider shrink-0 flex items-center gap-1.5 shadow-md z-20 border-r border-amber-500/40 h-full">
+                        <div className="bg-amber-800 text-amber-100 uppercase text-[10px] sm:text-xs font-black px-2 sm:px-3 py-1 sm:py-1.5 tracking-wider shrink-0 flex items-center gap-1 sm:gap-1.5 shadow-md z-20 border-r border-amber-500/40 h-full">
                             <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 animate-pulse" />
                             <span>Public Advisory</span>
                         </div>

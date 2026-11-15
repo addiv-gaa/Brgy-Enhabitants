@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../components/AuthContext';
+import api from '../api';
 import { Building, Heart, Shield, AlertTriangle, Users, Info, PhoneCall, Plus, Pencil, Trash2, X, Activity } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 interface EmergencyContact {
     id: number;
@@ -31,7 +30,7 @@ export default function EmergencyContacts() {
     // Check if the user is a staff member
     const userRole = auth?.user?.role || (auth?.user?.roles && auth?.user?.roles[0]) || '';
     
-    const canEdit = userRole.toUpperCase() === 'ADMIN';
+    const canEdit = ['ADMIN', 'STAFF', 'CAPTAIN'].includes(userRole.toUpperCase());
 
     const [contacts, setContacts] = useState<EmergencyContact[]>([]);
     const [loading, setLoading] = useState(true);
@@ -44,12 +43,9 @@ export default function EmergencyContacts() {
 
     const fetchContacts = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/emergency-contacts/`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setContacts(data.results || data);
+            const res = await api.get('/api/emergency-contacts/');
+            if (res.data) {
+                setContacts(res.data.results || res.data);
             }
         } catch (error) {
             console.error("Error fetching contacts:", error);
@@ -88,31 +84,20 @@ export default function EmergencyContacts() {
     };
 
     const executeSave = async () => {
-        const method = editingContact ? 'PUT' : 'POST';
-        const url = editingContact 
-            ? `${API_URL}/api/emergency-contacts/${editingContact.id}/`
-            : `${API_URL}/api/emergency-contacts/`;
-
         try {
-            const res = await fetch(url, {
-                method,
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (res.ok) {
-                fetchContacts();
-                closeModal();
-                setIsConfirmingSave(false);
+            if (editingContact) {
+                await api.put(`/api/emergency-contacts/${editingContact.id}/`, formData);
             } else {
-                alert("Failed to save contact.");
-                setIsConfirmingSave(false);
+                await api.post('/api/emergency-contacts/', formData);
             }
-        } catch (error) {
+
+            fetchContacts();
+            closeModal();
+            setIsConfirmingSave(false);
+        } catch (error: any) {
             console.error("Error saving contact:", error);
+            const msg = error.response?.data?.detail || error.response?.data?.error || "Failed to save contact.";
+            alert(msg);
             setIsConfirmingSave(false);
         }
     };
@@ -124,18 +109,12 @@ export default function EmergencyContacts() {
     const executeDelete = async () => {
         if (!contactToDelete) return;
         try {
-            const res = await fetch(`${API_URL}/api/emergency-contacts/${contactToDelete.id}/`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                fetchContacts();
-            } else {
-                alert("Failed to delete contact.");
-            }
-        } catch (error) {
+            await api.delete(`/api/emergency-contacts/${contactToDelete.id}/`);
+            fetchContacts();
+        } catch (error: any) {
             console.error("Error deleting contact:", error);
+            const msg = error.response?.data?.detail || error.response?.data?.error || "Failed to delete contact.";
+            alert(msg);
         } finally {
             setContactToDelete(null);
         }
@@ -159,20 +138,25 @@ export default function EmergencyContacts() {
         };
 
         return (
-            <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center shadow-sm relative group transition-colors hover:border-gray-300">
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 ${bgClasses[colorType]}`}>
-                    {ICONS[c.icon] || <PhoneCall className="w-5 h-5" />}
+            <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-3.5 sm:p-4 flex items-center shadow-sm relative group transition-colors hover:border-gray-300">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center mr-3 sm:mr-4 shrink-0 ${bgClasses[colorType]}`}>
+                    {ICONS[c.icon] || <PhoneCall className="w-4 h-4 sm:w-5 sm:h-5" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 text-sm truncate">{c.name}</h4>
-                    <p className="text-xs text-gray-500 truncate">{c.description}</p>
+                    <h4 className="font-semibold text-gray-900 text-xs sm:text-sm truncate">{c.name}</h4>
+                    <p className="text-[11px] sm:text-xs text-gray-500 truncate">{c.description}</p>
                 </div>
-                <div className={`font-bold text-sm ml-4 ${textClasses[colorType]} shrink-0`}>
-                    {c.phone}
-                </div>
+                <a 
+                    href={`tel:${c.phone.replace(/[^0-9+]/g, '')}`} 
+                    className={`font-bold text-xs sm:text-sm ml-2 sm:ml-4 ${textClasses[colorType]} hover:underline shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200/80 min-h-[36px] transition-colors`}
+                    title={`Call ${c.phone}`}
+                >
+                    <PhoneCall className="w-3.5 h-3.5" />
+                    <span>{c.phone}</span>
+                </a>
                 
                 {canEdit && (
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-md shadow-sm border border-gray-200 p-1 flex gap-1">
+                    <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-md shadow-sm border border-gray-200 p-1 flex gap-1">
                         <button onClick={() => openModal(c)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors">
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -206,13 +190,16 @@ export default function EmergencyContacts() {
                 </div>
 
                 {/* SOS Banner */}
-                <div className="bg-[#b91c1c] rounded-xl p-5 mb-8 flex items-center text-white shadow-md">
-                    <div className="bg-white/20 px-3 py-1.5 rounded-md font-bold text-xl mr-4 border border-white/30 backdrop-blur-sm">
-                        SOS
+                <div className="bg-[#b91c1c] rounded-xl p-4 sm:p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center text-white shadow-md gap-3 sm:gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 px-3 py-1.5 rounded-md font-bold text-lg sm:text-xl border border-white/30 backdrop-blur-sm shrink-0">
+                            SOS
+                        </div>
+                        <h2 className="text-base sm:text-lg font-bold sm:hidden">Emergency: Call 911</h2>
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold">Emergency: Call 911</h2>
-                        <p className="text-red-100 text-sm">For life-threatening situations, accidents, or major crimes</p>
+                        <h2 className="text-lg font-bold hidden sm:block">Emergency: Call 911</h2>
+                        <p className="text-red-100 text-xs sm:text-sm">For life-threatening situations, accidents, or major crimes</p>
                     </div>
                 </div>
 

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import BarangayCalendar from "../components/BarangayCalendar";
+import api from '../api';
 import { AlertTriangle, Save, CalendarPlus } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export default function StaffSchedulePage() {
     const [formData, setFormData] = useState({
@@ -51,36 +50,31 @@ export default function StaffSchedulePage() {
     };
 
     // F-028: Extract friendly error messages instead of raw text
-    const getFriendlyError = async (res: Response, fallback: string) => {
-        try {
-            const data = await res.json();
-            return data?.error || data?.detail || 
-                (typeof data === 'object' && Object.values(data)[0] ? (Array.isArray(Object.values(data)[0]) ? (Object.values(data)[0] as string[])[0] : Object.values(data)[0]) : null) || 
-                fallback;
-        } catch {
-            return fallback;
+    const getFriendlyError = (error: any, fallback: string) => {
+        const data = error?.response?.data;
+        if (!data) return error?.message || fallback;
+        if (typeof data === 'string') return data;
+        if (data.error) return data.error;
+        if (data.detail) return data.detail;
+        if (typeof data === 'object') {
+            const firstVal = Object.values(data)[0];
+            if (Array.isArray(firstVal)) return firstVal[0];
+            if (typeof firstVal === 'string') return firstVal;
         }
+        return fallback;
     };
 
     const executeAdd = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/events/`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            if (response.ok) {
-                setRefreshTrigger(prev => prev + 1);
-                setFormData({ title: '', event_type: 'ACTIVITY', description: '', start_time: '', end_time: '' });
-                setIsConfirmingAdd(false);
-            } else {
-                const msg = await getFriendlyError(response, "Failed to create event. Please verify required fields.");
-                alert(msg);
-                setIsConfirmingAdd(false);
-            }
-        } catch (error) {
+            await api.post('/api/events/', formData);
+            setRefreshTrigger(prev => prev + 1);
+            setFormData({ title: '', event_type: 'ACTIVITY', description: '', start_time: '', end_time: '' });
+            setIsConfirmingAdd(false);
+        } catch (error: any) {
             console.error("Error adding event:", error);
+            const msg = getFriendlyError(error, "Failed to create event. Please verify required fields.");
+            alert(msg);
+            setIsConfirmingAdd(false);
         }
     };
 
@@ -104,27 +98,19 @@ export default function StaffSchedulePage() {
 
     const executeEdit = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/events/${editEventData.raw_id}/`, {
-                method: 'PATCH',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: editEventData.title,
-                    description: editEventData.description,
-                    event_type: editEventData.event_type
-                })
+            await api.patch(`/api/events/${editEventData.raw_id}/`, {
+                title: editEventData.title,
+                description: editEventData.description,
+                event_type: editEventData.event_type
             });
-            if (response.ok) {
-                setRefreshTrigger(prev => prev + 1);
-                setIsConfirmingEdit(false);
-                setEditEventData(null);
-            } else {
-                const msg = await getFriendlyError(response, "Failed to update event. Please verify required fields.");
-                alert(msg);
-                setIsConfirmingEdit(false);
-            }
-        } catch (error) {
+            setRefreshTrigger(prev => prev + 1);
+            setIsConfirmingEdit(false);
+            setEditEventData(null);
+        } catch (error: any) {
             console.error("Error updating event:", error);
+            const msg = getFriendlyError(error, "Failed to update event. Please verify required fields.");
+            alert(msg);
+            setIsConfirmingEdit(false);
         }
     };
 
@@ -135,21 +121,15 @@ export default function StaffSchedulePage() {
     const executeDelete = async () => {
         if (!eventToDelete) return;
         try {
-            const response = await fetch(`${API_URL}/api/events/${eventToDelete.raw_id}/`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (response.ok) {
-                setRefreshTrigger(prev => prev + 1);
-                setEventToDelete(null);
-                setEditEventData(null);
-            } else {
-                const msg = await getFriendlyError(response, "Failed to delete event.");
-                alert(msg);
-                setEventToDelete(null);
-            }
-        } catch (error) {
+            await api.delete(`/api/events/${eventToDelete.raw_id}/`);
+            setRefreshTrigger(prev => prev + 1);
+            setEventToDelete(null);
+            setEditEventData(null);
+        } catch (error: any) {
             console.error("Error deleting event:", error);
+            const msg = getFriendlyError(error, "Failed to delete event.");
+            alert(msg);
+            setEventToDelete(null);
         }
     };
 

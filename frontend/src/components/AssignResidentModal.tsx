@@ -74,11 +74,11 @@ export default function AssignResidentModal({ householdId, onClose, onAssignSucc
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[80vh] overflow-hidden animate-fade-in-up">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-3 sm:p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[85dvh] overflow-hidden animate-fade-in-up">
                 
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-                    <h2 className="text-xl font-bold text-gray-900">Link Existing Resident</h2>
+                <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">Link Existing Resident</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
                 

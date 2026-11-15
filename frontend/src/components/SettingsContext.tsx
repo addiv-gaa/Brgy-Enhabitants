@@ -12,7 +12,6 @@ export interface BarangaySettings {
     official_contact_email: string;
     official_contact_number: string;
     barangay_seal?: string | null;
-    barangay_seal_url?: string | null;
     emergency_hotline: string;
     police_hotline: string;
     fire_hotline: string;
@@ -24,6 +23,9 @@ export interface BarangaySettings {
     barangay_province?: string;
     barangay_region?: string;
     number_of_puroks?: string;
+    registered_residents_override?: number | null;
+    total_registered_residents?: number;
+    live_residents_count?: number;
     operating_hours?: string;
     show_advisory_banner?: boolean;
     advisory_banner_text?: string;
@@ -76,16 +78,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const getSealUrl = useCallback((path?: string | null): string => {
         const seal = path !== undefined ? path : settings?.barangay_seal;
         if (!seal) {
-            // Also check legacy barangay_seal_url
-            if (settings?.barangay_seal_url && settings.barangay_seal_url.trim()) {
-                const legacy = settings.barangay_seal_url.trim();
-                return legacy.startsWith('http') ? legacy : `${API_URL}${legacy}`;
-            }
             return '/b4-logo.jpg';
         }
         if (seal.startsWith('http')) return seal;
         return `${API_URL}${seal.startsWith('/') ? seal : `/${seal}`}`;
-    }, [settings?.barangay_seal, settings?.barangay_seal_url]);
+    }, [settings?.barangay_seal]);
 
     const fetchSettings = useCallback(async (): Promise<BarangaySettings | null> => {
         try {

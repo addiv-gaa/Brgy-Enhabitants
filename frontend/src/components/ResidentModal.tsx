@@ -123,16 +123,16 @@ export default function ResidentModal({ mode, resident, households, onClose, onS
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90dvh] flex flex-col overflow-hidden">
                 
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h2 className="text-xl font-bold text-gray-800">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">
                         {mode === 'add' ? 'Add New Resident' : mode === 'edit' ? 'Edit Resident Profile' : 'Resident Details'}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2">&times;</button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 bg-white">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white">
                     <form id="resident-form" onSubmit={handleSubmit} className="space-y-4">
                         
                         <h3 className="text-sm font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4 uppercase tracking-wide">Personal Information</h3>
@@ -246,7 +246,7 @@ export default function ResidentModal({ mode, resident, households, onClose, onS
                         <h3 className={sectionHeaderClass}>Address & Household</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className={labelClass}>Purok / Zone *</label>
+                                <label className={labelClass}>Alley *</label>
                                 <input type="text" name="purok" value={formData.purok} onChange={handleChange} required disabled={isViewOnly} className={inputClass} />
                             </div>
                             <div>
@@ -272,7 +272,7 @@ export default function ResidentModal({ mode, resident, households, onClose, onS
                         </div>
 
                         <h3 className={sectionHeaderClass}>Sector / Vulnerability Group</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 bg-gray-50 p-3.5 sm:p-4 rounded-lg border border-gray-200">
                             {/* FIXED ALL CHECKBOX NAMES */}
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="is_4ps_beneficiary" checked={formData.is_4ps_beneficiary} onChange={handleChange} disabled={isViewOnly} className="w-4 h-4 text-green-600 rounded" />
@@ -307,7 +307,7 @@ export default function ResidentModal({ mode, resident, households, onClose, onS
                     </form>
                 </div>
 
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                         {isViewOnly ? 'Close' : 'Cancel'}
                     </button>

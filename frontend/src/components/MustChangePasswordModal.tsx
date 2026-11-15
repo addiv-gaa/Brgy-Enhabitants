@@ -61,21 +61,21 @@ export default function MustChangePasswordModal() {
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white w-full max-w-md max-h-[95dvh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-100 transform transition-all animate-in fade-in zoom-in-95 duration-200">
                 {/* Header Banner */}
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-6 text-white text-center relative">
-                    <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto mb-3 shadow-inner">
-                        <KeyRound className="w-7 h-7 text-white" />
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-4 sm:px-6 py-5 sm:py-6 text-white text-center relative shrink-0">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                        <KeyRound className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                     </div>
-                    <h2 className="text-xl font-bold tracking-tight">Security Action Required</h2>
+                    <h2 className="text-lg sm:text-xl font-bold tracking-tight">Security Action Required</h2>
                     <p className="text-xs text-blue-100 mt-1 max-w-xs mx-auto">
                         Your account was provisioned with a temporary password. Please set your permanent password to continue.
                     </p>
                 </div>
 
                 {/* Form Container */}
-                <div className="p-6 md:p-8">
+                <div className="p-4 sm:p-6 md:p-8">
                     {isSuccess ? (
                         <div className="py-6 text-center space-y-3">
                             <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto animate-bounce">

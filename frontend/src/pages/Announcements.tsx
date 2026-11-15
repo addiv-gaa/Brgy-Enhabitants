@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../components/AuthContext";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from "../api";
+import { Pencil, Trash2, RotateCcw, Archive, Plus, X, Calendar, AlertTriangle, Paperclip } from 'lucide-react';
 
 interface Announcement {
     id: number;
@@ -34,9 +34,12 @@ export default function Announcements() {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     
-    // Modals
+    // Modals & Active Actions
     const [isConfirmingCreate, setIsConfirmingCreate] = useState<boolean>(false);
     const [annToArchive, setAnnToArchive] = useState<{ id: number, currentStatus: boolean } | null>(null);
+    const [annToDelete, setAnnToDelete] = useState<Announcement | null>(null);
+    const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+    const [removeExistingAttachment, setRemoveExistingAttachment] = useState<boolean>(false);
 
     // Core Announcement Data
     const [formData, setFormData] = useState({
@@ -78,17 +81,12 @@ export default function Announcements() {
         setIsLoading(true);
         try {
             const query = activeTab === 'archived' ? '?archived=true' : '';
-            const res = await fetch(`${API_URL}/api/announcements/${query}`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setAnnouncements(data.results || data);
-            } else {
-                console.error("Failed to fetch announcements. Status:", res.status);
+            const res = await api.get(`/api/announcements/${query}`);
+            if (res.data) {
+                setAnnouncements(res.data.results || res.data);
             }
         } catch (error) {
-            console.error("Error fetching data:", error);
+            console.error("Error fetching announcements data:", error);
         } finally {
             setIsLoading(false);
         }
@@ -97,11 +95,67 @@ export default function Announcements() {
     // F-023: Reset form draft state when cancelling or closing modal
     const handleCloseModal = () => {
         setIsModalOpen(false);
+        setEditingAnnouncement(null);
+        setRemoveExistingAttachment(false);
         setFormData({ title: "", content: "", categories: [], is_urgent: false, attachment: null });
         setTagsList([]);
         setTagInput("");
         setHasEvent(false);
         setEventData({ startDate: "", startTime: "", endDate: "", endTime: "" });
+    };
+
+    // Helper: Parse ISO strings into date/time inputs for HTML5 date/time pickers
+    const parseDateTimeToInput = (isoString?: string) => {
+        if (!isoString) return { date: "", time: "" };
+        try {
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) {
+                const parts = isoString.split('T');
+                return { date: parts[0] || "", time: (parts[1] || "").slice(0, 5) };
+            }
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return {
+                date: `${year}-${month}-${day}`,
+                time: `${hours}:${minutes}`
+            };
+        } catch {
+            return { date: "", time: "" };
+        }
+    };
+
+    // Open edit modal and populate state
+    const handleOpenEditModal = (ann: Announcement) => {
+        setEditingAnnouncement(ann);
+        setRemoveExistingAttachment(false);
+        setFormData({
+            title: ann.title || "",
+            content: ann.content || "",
+            categories: Array.isArray(ann.categories) ? ann.categories : [],
+            is_urgent: !!ann.is_urgent,
+            attachment: null
+        });
+        setTagsList(ann.tags ? ann.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+        setTagInput("");
+
+        if (ann.linked_event_details) {
+            setHasEvent(true);
+            const start = parseDateTimeToInput(ann.linked_event_details.start_time);
+            const end = parseDateTimeToInput(ann.linked_event_details.end_time);
+            setEventData({
+                startDate: start.date,
+                startTime: start.time,
+                endDate: end.date,
+                endTime: end.time
+            });
+        } else {
+            setHasEvent(false);
+            setEventData({ startDate: "", startTime: "", endDate: "", endTime: "" });
+        }
+        setIsModalOpen(true);
     };
 
     // F-027: Format raw event timestamps into human-friendly strings (YYYY-MM-DD HH:mm)
@@ -140,19 +194,30 @@ export default function Announcements() {
         if (!annToArchive) return;
         try {
             const action = annToArchive.currentStatus ? 'unarchive' : 'archive';
-            const res = await fetch(`${API_URL}/api/announcements/${annToArchive.id}/${action}/`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                fetchData();
-            } else {
-                alert(`Failed to ${action} announcement.`);
-            }
-        } catch (error) {
+            await api.post(`/api/announcements/${annToArchive.id}/${action}/`);
+            fetchData();
+        } catch (error: any) {
             console.error("Archive toggle error:", error);
+            const action = annToArchive?.currentStatus ? 'unarchive' : 'archive';
+            const msg = error.response?.data?.detail || error.response?.data?.error || `Failed to ${action} announcement.`;
+            alert(msg);
         } finally {
             setAnnToArchive(null);
+        }
+    };
+
+    // Delete Handler (for Archived Announcements)
+    const executeDeleteAnnouncement = async () => {
+        if (!annToDelete) return;
+        try {
+            await api.delete(`/api/announcements/${annToDelete.id}/`);
+            fetchData();
+        } catch (error: any) {
+            console.error("Delete announcement error:", error);
+            const msg = error.response?.data?.detail || error.response?.data?.error || "Failed to delete announcement.";
+            alert(msg);
+        } finally {
+            setAnnToDelete(null);
         }
     };
 
@@ -184,6 +249,7 @@ export default function Announcements() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setFormData(prev => ({ ...prev, attachment: e.target.files![0] }));
+            setRemoveExistingAttachment(false);
         }
     };
 
@@ -196,12 +262,7 @@ export default function Announcements() {
             }
             const startDateTime = new Date(`${eventData.startDate}T${eventData.startTime}`);
             const endDateTime = new Date(`${eventData.endDate}T${eventData.endTime}`);
-            const now = new Date();
 
-            if (startDateTime < new Date(now.getTime() - 5 * 60 * 1000)) {
-                alert("Event start time cannot be in the past.");
-                return;
-            }
             if (endDateTime < startDateTime) {
                 alert("Event end time cannot be before start time.");
                 return;
@@ -213,7 +274,7 @@ export default function Announcements() {
     const executeSubmit = async () => {
         setIsConfirmingCreate(false);
         setIsSubmitting(true);
-        let createdEventId = null;
+        let createdEventId = editingAnnouncement?.linked_event || null;
 
         try {
             if (hasEvent && eventData.startDate && eventData.startTime && eventData.endDate && eventData.endTime) {
@@ -228,26 +289,22 @@ export default function Announcements() {
                     end_time: endDateTime
                 };
 
-                const eventRes = await fetch(`${API_URL}/api/events/`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(eventPayload)
-                });
-
-                if (!eventRes.ok) {
-                    const errData = await eventRes.json().catch(() => ({}));
+                try {
+                    if (createdEventId) {
+                        await api.patch(`/api/events/${createdEventId}/`, eventPayload);
+                    } else {
+                        const eventRes = await api.post('/api/events/', eventPayload);
+                        createdEventId = eventRes.data.id;
+                    }
+                } catch (eventErr: any) {
+                    const errData = eventErr.response?.data;
                     const msg = (errData?.start_time && errData.start_time[0]) || 
                                 (errData?.end_time && errData.end_time[0]) || 
-                                errData?.error || 
-                                "Failed to create calendar event";
+                                errData?.error || errData?.detail ||
+                                "Failed to save calendar event";
                     alert(msg);
                     throw new Error(msg);
                 }
-                const newEvent = await eventRes.json();
-                createdEventId = newEvent.id;
             }
 
             const submitData = new FormData();
@@ -258,33 +315,37 @@ export default function Announcements() {
             
             if (tagsList.length > 0) {
                 submitData.append('tags', tagsList.join(', '));
+            } else {
+                submitData.append('tags', '');
             }
-            if (createdEventId) {
+            if (hasEvent && createdEventId) {
                 submitData.append('linked_event', createdEventId.toString());
+            } else if (!hasEvent) {
+                submitData.append('linked_event', '');
             }
+
             if (formData.attachment) {
                 submitData.append('attachment', formData.attachment);
+            } else if (removeExistingAttachment) {
+                submitData.append('attachment', '');
             }
 
-            const response = await fetch(`${API_URL}/api/announcements/`, {
-                method: 'POST',
-                credentials: 'include',
-                body: submitData
-            });
-
-            if (response.ok) {
-                handleCloseModal();
-                fetchData(); 
+            if (editingAnnouncement) {
+                await api.patch(`/api/announcements/${editingAnnouncement.id}/`, submitData);
             } else {
-                const errorData = await response.json().catch(() => ({}));
-                const errDetail = errorData?.error || errorData?.detail || 
-                    (typeof errorData === 'object' && Object.values(errorData)[0] ? (Array.isArray(Object.values(errorData)[0]) ? (Object.values(errorData)[0] as string[])[0] : Object.values(errorData)[0]) : null) || 
-                    "Failed to post announcement. Please verify your inputs.";
-                alert(typeof errDetail === 'string' ? errDetail : "Failed to post announcement.");
+                await api.post('/api/announcements/', submitData);
             }
-        } catch (error) {
+
+            handleCloseModal();
+            fetchData(); 
+        } catch (error: any) {
             console.error("Submit error:", error);
-            alert("An error occurred while posting the announcement.");
+            const errorData = error.response?.data;
+            const errDetail = errorData?.error || errorData?.detail || 
+                (typeof errorData === 'object' && Object.values(errorData)[0] ? (Array.isArray(Object.values(errorData)[0]) ? (Object.values(errorData)[0] as string[])[0] : Object.values(errorData)[0]) : null) || 
+                error.message ||
+                "Failed to save announcement. Please verify your inputs.";
+            alert(typeof errDetail === 'string' ? errDetail : "Failed to save announcement.");
         } finally {
             setIsSubmitting(false);
         }
@@ -311,11 +372,14 @@ export default function Announcements() {
                                         <button onClick={() => setActiveTab('archived')} className={`px-4 py-1.5 text-sm font-semibold rounded-md ${activeTab === 'archived' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Archived</button>
                                     </div>
                                     <button 
-                                        onClick={() => setIsModalOpen(true)}
+                                        onClick={() => {
+                                            handleCloseModal();
+                                            setIsModalOpen(true);
+                                        }}
                                         className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2"
                                     >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                                        Create Announcement
+                                        <Plus className="w-4 h-4" />
+                                        <span>Create Announcement</span>
                                     </button>
                                 </div>
                             )}
@@ -397,17 +461,49 @@ export default function Announcements() {
                                                 <span>Posted: {new Date(ann.created_at).toISOString().split('T')[0]}</span>
                                                 <span>By {ann.author_name}</span>
                                             </div>
-                                            {canCreate && (
-                                                <div className="border-t border-gray-100 bg-gray-50 px-6 py-3 flex justify-end">
-                                                    <button 
-                                                        onClick={() => handleToggleArchive(ann.id, activeTab === 'archived')}
-                                                        className={`text-sm font-semibold px-4 py-1.5 rounded border transition-colors ${activeTab === 'archived' ? 'border-green-200 text-green-600 hover:bg-green-50' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}`}
-                                                    >
-                                                        {activeTab === 'archived' ? 'Restore to Live Feed' : 'Archive Post'}
-                                                    </button>
-                                                </div>
-                                            )}
                                         </div>
+                                        {canCreate && (
+                                            <div className="border-t border-gray-100 bg-gray-50 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-end gap-2">
+                                                <button 
+                                                    onClick={() => handleOpenEditModal(ann)}
+                                                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded border border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 transition-colors shadow-sm"
+                                                    title="Edit Announcement"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    <span>Edit</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleToggleArchive(ann.id, activeTab === 'archived')}
+                                                    className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded border transition-colors shadow-sm ${
+                                                        activeTab === 'archived' 
+                                                            ? 'border-green-200 text-green-700 bg-green-50/50 hover:bg-green-100' 
+                                                            : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {activeTab === 'archived' ? (
+                                                        <>
+                                                            <RotateCcw className="w-3.5 h-3.5" />
+                                                            <span>Restore to Live Feed</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Archive className="w-3.5 h-3.5" />
+                                                            <span>Archive Post</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {activeTab === 'archived' && (
+                                                    <button 
+                                                        onClick={() => setAnnToDelete(ann)}
+                                                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded border border-red-200 text-red-600 bg-red-50/50 hover:bg-red-100 transition-colors shadow-sm"
+                                                        title="Delete Announcement Permanently"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        <span>Delete</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             )}
@@ -422,9 +518,18 @@ export default function Announcements() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
                         
                         <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
-                            <h3 className="text-xl font-bold text-gray-900">Post Announcement</h3>
+                            <div className="flex items-center gap-2">
+                                {editingAnnouncement ? (
+                                    <Pencil className="w-5 h-5 text-blue-600" />
+                                ) : (
+                                    <Plus className="w-5 h-5 text-green-600" />
+                                )}
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    {editingAnnouncement ? "Edit Announcement" : "Post Announcement"}
+                                </h3>
+                            </div>
                             <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
                         
@@ -529,12 +634,48 @@ export default function Announcements() {
                                 {/* Attach Media Upload Box */}
                                 <div>
                                     <label className="block text-sm font-bold text-gray-800 mb-2">Attach Media <span className="text-gray-400 font-normal text-xs">(image, GIF, or video)</span></label>
+                                    
+                                    {editingAnnouncement?.attachment && !removeExistingAttachment && !formData.attachment && (
+                                        <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+                                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                <Paperclip className="w-4 h-4 text-gray-500 shrink-0" />
+                                                <span className="text-xs text-gray-600 truncate">
+                                                    Current attachment: <span className="font-semibold text-gray-800">{editingAnnouncement.attachment.split('/').pop()}</span>
+                                                </span>
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setRemoveExistingAttachment(true)}
+                                                className="text-xs text-red-600 hover:text-red-800 font-semibold shrink-0 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {removeExistingAttachment && !formData.attachment && (
+                                        <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between text-xs text-red-700">
+                                            <span>Attachment will be removed upon saving.</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setRemoveExistingAttachment(false)}
+                                                className="text-xs text-blue-600 hover:underline font-semibold"
+                                            >
+                                                Undo
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="relative border-2 border-dashed border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors p-8 text-center cursor-pointer group">
                                         <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,video/*" />
                                         <div className="flex flex-col items-center">
                                             <svg className="w-8 h-8 text-gray-400 mb-2 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                            <p className="text-sm font-semibold text-gray-700">Click to upload image, GIF, or video</p>
-                                            <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{formData.attachment ? formData.attachment.name : 'JPG, PNG, GIF, MP4, WEBM'}</p>
+                                            <p className="text-sm font-semibold text-gray-700">
+                                                {editingAnnouncement && !formData.attachment ? 'Click to replace existing attachment' : 'Click to upload image, GIF, or video'}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">
+                                                {formData.attachment ? formData.attachment.name : (editingAnnouncement?.attachment && !removeExistingAttachment ? 'Leave empty to keep current attachment' : 'JPG, PNG, GIF, MP4, WEBM')}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -547,7 +688,7 @@ export default function Announcements() {
                                 Cancel
                             </button>
                             <button type="submit" form="announcement-form" disabled={isSubmitting || formData.categories.length === 0} className="px-6 py-3 w-2/3 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-center shadow-md">
-                                {isSubmitting ? "Processing..." : "Post Announcement"}
+                                {isSubmitting ? "Processing..." : (editingAnnouncement ? "Save Changes" : "Post Announcement")}
                             </button>
                         </div>
                     </div>
@@ -579,7 +720,32 @@ export default function Announcements() {
                 </div>
             )}
 
-            {/* Create Confirmation Modal */}
+            {/* Delete Confirmation Modal */}
+            {annToDelete && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-red-100">
+                        <div className="p-6 text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Announcement?</h2>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Are you sure you want to permanently delete <span className="font-semibold text-gray-800">"{annToDelete.title}"</span>? This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setAnnToDelete(null)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors">
+                                    Cancel
+                                </button>
+                                <button onClick={executeDeleteAnnouncement} className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
+                                    Yes, Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create / Edit Confirmation Modal */}
             {isConfirmingCreate && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-green-100">
@@ -587,16 +753,20 @@ export default function Announcements() {
                             <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
                             </div>
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">Publish Announcement?</h2>
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">
+                                {editingAnnouncement ? "Save Changes?" : "Publish Announcement?"}
+                            </h2>
                             <p className="text-sm text-gray-500 mb-6">
-                                {hasEvent ? `You are about to publish this announcement and create a linked Calendar Event on ${eventData.startDate}. Are you sure you want to proceed?` : 'Are you sure you want to publish this announcement to the live feed?'}
+                                {editingAnnouncement
+                                    ? (hasEvent ? `You are about to save changes to this announcement and update the linked Calendar Event. Are you sure you want to proceed?` : 'Are you sure you want to save changes to this announcement?')
+                                    : (hasEvent ? `You are about to publish this announcement and create a linked Calendar Event on ${eventData.startDate}. Are you sure you want to proceed?` : 'Are you sure you want to publish this announcement to the live feed?')}
                             </p>
                             <div className="flex gap-3">
                                 <button onClick={() => setIsConfirmingCreate(false)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors">
                                     Review
                                 </button>
                                 <button onClick={executeSubmit} className="flex-1 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
-                                    Yes, Publish
+                                    {editingAnnouncement ? "Yes, Save" : "Yes, Publish"}
                                 </button>
                             </div>
                         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../components/AuthContext";
 import { useSettings } from "../components/SettingsContext";
 import DashboardAdminView from "../components/DashboardAdminView";
+import api from "../api";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -49,10 +50,9 @@ export default function Home() {
 
     const fetchAnnouncements = useCallback(async () => {
         try {
-            const annRes = await fetch(`${API_URL}/api/announcements/`, { credentials: 'include' });
-            if (annRes.ok) {
-                const annData = await annRes.json();
-                setAnnouncements(annData.results || annData);
+            const annRes = await api.get('/api/announcements/');
+            if (annRes.data) {
+                setAnnouncements(annRes.data.results || annRes.data);
             }
         } catch (error) {
             console.error("Error fetching announcements:", error);
@@ -61,10 +61,9 @@ export default function Home() {
 
     const fetchEmergencyContacts = useCallback(async () => {
         try {
-            const res = await fetch(`${API_URL}/api/emergency-contacts/`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setEmergencyContacts(data.results || data);
+            const res = await api.get('/api/emergency-contacts/');
+            if (res.data) {
+                setEmergencyContacts(res.data.results || res.data);
             }
         } catch (error) {
             console.error("Error fetching emergency contacts:", error);
@@ -80,10 +79,9 @@ export default function Home() {
             // If logged-in staff/captain/admin, fetch system-wide dashboard metrics
             if (auth?.user && isCaptainOrSecretary) {
                 try {
-                    const response = await fetch(`${API_URL}/api/dashboard-stats/`, { credentials: 'include' });
-                    if (response.ok) {
-                        const data = await response.json();
-                        setStats(data);
+                    const response = await api.get('/api/dashboard-stats/');
+                    if (response.data) {
+                        setStats(response.data);
                     }
                 } catch (error) {
                     console.error("Error fetching stats:", error);
@@ -134,7 +132,7 @@ export default function Home() {
                             <>
                                 {/* PUNONG BARANGAY MESSAGE */}
                                 {settings && (
-                                    <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12 mt-4 w-full max-w-5xl mx-auto px-6 sm:px-12">
+                                    <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12 mt-4 w-full max-w-5xl mx-auto px-4 sm:px-8 md:px-12">
                                         <div className="flex flex-col items-center">
                                             <div className="w-32 h-32 rounded-full border-4 border-green-100 overflow-hidden bg-gray-100 mb-2 shrink-0 flex items-center justify-center">
                                                 {settings.captain_image ? (
@@ -160,7 +158,7 @@ export default function Home() {
                                 )}
 
                                 {/* QUICK ACTIONS */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 w-full max-w-5xl mx-auto px-6 sm:px-12">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-10 w-full max-w-5xl mx-auto px-4 sm:px-8 md:px-12">
                                     <button onClick={() => navigate('/announcements')} className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-300 hover:shadow-md transition-all group">
                                         <div className="p-3 bg-orange-50 text-orange-600 rounded-full mb-3 group-hover:scale-110 transition-transform"><MegaphoneIcon /></div>
                                         <span className="font-bold text-gray-900">Announcements</span>
@@ -181,7 +179,7 @@ export default function Home() {
                                 {/* ABOUT SECTION */}
                                 {settings && (
                                     <div className="bg-[#eff7f0] rounded-none sm:rounded-2xl py-8 sm:py-12 mb-10 w-full">
-                                        <div className="w-full max-w-5xl mx-auto px-6 sm:px-12 flex flex-col items-start text-left">
+                                        <div className="w-full max-w-5xl mx-auto px-4 sm:px-8 md:px-12 flex flex-col items-start text-left">
                                         
                                         <div className="flex items-center gap-3 mb-10 w-full">
                                             <div className="w-1.5 h-8 bg-[#2d6a4f] shrink-0"></div>
@@ -207,7 +205,7 @@ export default function Home() {
                                             </div>
                                             <div className="bg-[#dcf0d9] p-5 rounded-xl">
                                                 <p className="text-xs text-gray-600 mb-1">Registered Residents</p>
-                                                <p className="font-bold text-gray-900">{stats?.total_residents || "0"} ({new Date().getFullYear()})</p>
+                                                <p className="font-bold text-gray-900">{(settings?.total_registered_residents ?? stats?.total_residents ?? 0).toLocaleString()} ({new Date().getFullYear()})</p>
                                             </div>
                                             {settings.operating_hours && (
                                                 <div className="bg-[#dcf0d9] p-5 rounded-xl">

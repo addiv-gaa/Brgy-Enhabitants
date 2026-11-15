@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import * as XLSX from 'xlsx';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from '../api';
+import { AlertCircle, RefreshCw, Download, Bot } from 'lucide-react';
 
 function DemographicsAiAssistant() {
     const [query, setQuery] = useState('');
@@ -15,37 +14,48 @@ function DemographicsAiAssistant() {
 
         setIsAnalyzing(true);
         try {
-            const res = await fetch(`${API_URL}/api/reports/demographics-ai/`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: query })
-            });
-
-            const data = await res.json();
-            if (res.ok) setResponse(data.reply);
-            else alert(data.error || "Failed to analyze data.");
-        } catch (error) {
-            console.error(error);
-            alert("Network error connecting to staff AI.");
+            const res = await api.post('/api/reports/demographics-ai/', { prompt: query });
+            if (res.data?.reply) {
+                setResponse(res.data.reply);
+            } else {
+                alert("No response generated. Please try again.");
+            }
+        } catch (error: any) {
+            console.error("Demographics AI error:", error);
+            const errMsg = error.response?.data?.error || error.response?.data?.detail || "Network error connecting to staff AI.";
+            alert(errMsg);
         } finally {
             setIsAnalyzing(false);
         }
     };
 
     return (
-        <div className="bg-white rounded-xl border border-indigo-100 shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-xl border border-indigo-100 shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">AI</div>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                    <Bot className="w-4 h-4" />
+                </div>
                 <div>
                     <h3 className="text-base font-bold text-gray-900">Demographic Intelligence</h3>
                     <p className="text-xs text-gray-500">Ask strategic questions about the RBI data.</p>
                 </div>
             </div>
 
-            <form onSubmit={handleAskAi} className="flex gap-2 mb-4">
-                <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g., Summarize the vulnerabilities in our Labor Force." className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" disabled={isAnalyzing} />
-                <button type="submit" disabled={isAnalyzing || !query.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
+            <form onSubmit={handleAskAi} className="flex flex-col sm:flex-row gap-2 mb-4">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="e.g., Summarize the vulnerabilities in our Labor Force."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    disabled={isAnalyzing}
+                />
+                <button
+                    type="submit"
+                    disabled={isAnalyzing || !query.trim()}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
+                >
+                    {isAnalyzing && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                     {isAnalyzing ? "Analyzing..." : "Ask AI"}
                 </button>
             </form>
@@ -70,26 +80,37 @@ function DemographicsAiAssistant() {
 export default function Reports() {
     const [data, setData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+
+    const fetchReportData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const res = await api.get('/api/reports/rbi-form-c/');
+            if (res.data && res.data.age_brackets) {
+                setData(res.data);
+            } else {
+                throw new Error("Invalid or incomplete demographic data received from server.");
+            }
+        } catch (err: any) {
+            console.error("Error fetching RBI Form C data:", err);
+            const msg = err.response?.data?.detail || err.message || "Failed to load RBI Form C data.";
+            setError(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        fetch(`${API_URL}/api/reports/rbi-form-c/`, { credentials: 'include' })
-            .then(res => res.json())
-            .then(resData => {
-                setData(resData);
-                setIsLoading(false);
-            })
-            .catch(error => {
-                console.error("Error fetching RBI Form C data:", error);
-                setIsLoading(false);
-            });
+        fetchReportData();
     }, []);
 
     const exportToExcel = async () => {
+        setIsExporting(true);
         try {
-            const res = await fetch(`${API_URL}/api/reports/rbi-form-c/download/`, { credentials: 'include' });
-            if (!res.ok) throw new Error("Failed to download report");
-            
-            const blob = await res.blob();
+            const res = await api.get('/api/reports/rbi-form-c/download/', { responseType: 'blob' });
+            const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -99,24 +120,48 @@ export default function Reports() {
             window.URL.revokeObjectURL(url);
             alert("RBI Form C report exported successfully and automatically archived to Documents & Records!");
         } catch (error) {
-            console.error(error);
+            console.error("Excel export error:", error);
             alert("Error downloading styled Excel report.");
+        } finally {
+            setIsExporting(false);
         }
     };
 
-    if (isLoading || !data) {
+    if (isLoading) {
         return (
-            <div className="h-full w-full flex items-center justify-center bg-gray-50">
-                <p className="text-gray-500 font-medium">Loading Form C Data...</p>
+            <div className="h-full w-full min-h-0 flex items-center justify-center bg-gray-50 p-4">
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+                    <p className="text-gray-600 font-medium text-sm">Loading Form C Data...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="h-full w-full min-h-0 flex items-center justify-center bg-gray-50 p-4">
+                <div className="bg-white border border-red-200 rounded-xl p-6 sm:p-8 max-w-md w-full text-center shadow-sm">
+                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Unable to Load Reports</h3>
+                    <p className="text-sm text-gray-600 mb-6">{error || "Could not retrieve demographic records."}</p>
+                    <button
+                        onClick={fetchReportData}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Try Again
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="h-full w-full flex flex-col bg-gray-50 overflow-hidden text-gray-800">
-            
-
-            <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="h-full w-full min-h-0 flex flex-col bg-gray-50 overflow-hidden text-gray-800">
+            <main className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-6 md:p-8">
                 <div className="max-w-5xl mx-auto">
                     <DemographicsAiAssistant />
 
@@ -126,14 +171,18 @@ export default function Reports() {
                                 <h2 className="text-xl font-bold text-gray-900">RBI FORM C (Revised 2024)</h2>
                                 <p className="text-gray-500 text-sm">Semestral Monitoring Report</p>
                             </div>
-                            <button onClick={exportToExcel} className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 flex items-center gap-2 transition-colors self-start sm:self-auto">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Download Excel
+                            <button
+                                onClick={exportToExcel}
+                                disabled={isExporting}
+                                className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 flex items-center gap-2 transition-colors self-start sm:self-auto disabled:opacity-60"
+                            >
+                                {isExporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                {isExporting ? "Exporting..." : "Download Excel"}
                             </button>
                         </div>
                         
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left border-collapse">
+                            <table className="w-full text-sm text-left border-collapse min-w-[540px]">
                                 <thead>
                                     <tr className="bg-gray-100">
                                         <th className="border p-2 font-bold w-1/2">INDICATORS</th>
@@ -144,12 +193,12 @@ export default function Reports() {
                                 </thead>
                                 <tbody>
                                     <tr className="bg-gray-50 font-bold"><td colSpan={4} className="border p-2">Population by Age Bracket:</td></tr>
-                                    {Object.entries(data.age_brackets).map(([k, v]: [string, any]) => (
+                                    {Object.entries(data.age_brackets || {}).map(([k, v]: [string, any]) => (
                                         <tr key={k}>
                                             <td className="border p-2 pl-6">{k}</td>
-                                            <td className="border p-2 text-center">{v.male}</td>
-                                            <td className="border p-2 text-center">{v.female}</td>
-                                            <td className="border p-2 text-center font-bold bg-indigo-50/30">{v.total}</td>
+                                            <td className="border p-2 text-center">{v?.male ?? 0}</td>
+                                            <td className="border p-2 text-center">{v?.female ?? 0}</td>
+                                            <td className="border p-2 text-center font-bold bg-indigo-50/30">{v?.total ?? 0}</td>
                                         </tr>
                                     ))}
 
@@ -165,7 +214,7 @@ export default function Reports() {
                                         {label: 'Vulnerable Groups', key: 'vulnerable'},
                                         {label: 'Indigenous Peoples (IPs)', key: 'indigenous'},
                                     ].map(s => {
-                                        const v = data.sectors[s.key] || { male: 0, female: 0, total: 0 };
+                                        const v = data.sectors?.[s.key] || { male: 0, female: 0, total: 0 };
                                         return (
                                             <tr key={s.key}>
                                                 <td className="border p-2 pl-6">{s.label}</td>

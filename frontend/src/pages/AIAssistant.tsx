@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useContext } from "react";
 import { AuthContext } from "../components/AuthContext";
 import ReactMarkdown from 'react-markdown';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from "../api";
 
 // Define the shape of a chat message
 interface Message {
@@ -37,10 +36,9 @@ export default function AiAssistant() {
     const [dbFaqs, setDbFaqs] = useState<BarangayFAQ[]>([]);
 
     useEffect(() => {
-        fetch(`${API_URL}/api/faqs/`)
-            .then(res => res.json())
-            .then(data => {
-                const list = Array.isArray(data) ? data : (data.results || []);
+        api.get('/api/faqs/')
+            .then(res => {
+                const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
                 setDbFaqs(list.filter((f: BarangayFAQ) => f.is_active));
             })
             .catch(err => console.error("Could not fetch FAQs for AI assistant:", err));
@@ -106,29 +104,19 @@ export default function AiAssistant() {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${API_URL}/api/ai-assistant/`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ prompt: text })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                // 2. Add AI response to UI
-                const newBotMsg: Message = { id: (Date.now() + 1).toString(), text: data.reply, sender: 'bot' };
+            const response = await api.post('/api/ai-assistant/', { prompt: text });
+            if (response.data) {
+                const newBotMsg: Message = { id: (Date.now() + 1).toString(), text: response.data.reply, sender: 'bot' };
                 setMessages(prev => [...prev, newBotMsg]);
-            } else if (response.status === 429) {
+            }
+        } catch (error: any) {
+            if (error.response?.status === 429) {
                 alert("You are sending messages too quickly. Please wait a moment.");
             } else {
-                console.error("API Error:", response.status);
-                alert("Something went wrong connecting to the assistant.");
+                console.error("AI Assistant error:", error);
+                const msg = error.response?.data?.error || error.response?.data?.detail || "Something went wrong connecting to the assistant.";
+                alert(msg);
             }
-        } catch (error) {
-            console.error("Network error:", error);
-            alert("Network error occurred.");
         } finally {
             setIsLoading(false);
         }
@@ -158,7 +146,7 @@ export default function AiAssistant() {
                             <p className="text-gray-500 text-sm mt-1">Get answers to common barangay service questions</p>
                         </div>
 
-                        <div className="flex flex-col md:flex-row gap-8 flex-1 min-h-[500px] pb-8">
+                        <div className="flex flex-col md:flex-row gap-6 md:gap-8 flex-1 pb-8">
                         
                             {/* LEFT COLUMN: CHAT */}
                             <div className="flex-1 flex flex-col h-full">
@@ -174,10 +162,10 @@ export default function AiAssistant() {
                             </div>
                         ) : (
                             /* Chat Container Layout */
-                            <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col flex-1 min-h-[500px] mb-8">
+                            <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col flex-1 min-h-[400px] sm:min-h-[500px] mb-6 md:mb-8">
                                 
                                 {/* Message History Area */}
-                                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                                <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6">
                                     {messages.map((msg) => (
                                         <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                             

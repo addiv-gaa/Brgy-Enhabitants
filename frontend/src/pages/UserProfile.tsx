@@ -62,8 +62,8 @@ export default function Profile() {
     return (
         <div className="h-full w-full flex flex-col bg-gray-100 overflow-hidden text-gray-800">
             <div className="flex flex-1 overflow-hidden">
-                <main className="flex-1 w-full overflow-y-auto p-4 sm:p-8 bg-[#f4f7fa]">
-                    <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm p-6 sm:p-8">
+                <main className="flex-1 w-full overflow-y-auto p-3.5 sm:p-6 md:p-8 bg-[#f4f7fa]">
+                    <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm p-4 sm:p-6 md:p-8">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b pb-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900 mb-1">My Profile</h1>
@@ -117,7 +117,7 @@ export default function Profile() {
                                                     <p className="mt-1 text-base font-semibold text-gray-900">{profile.civil_status || "—"}</p>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-gray-500 uppercase">Purok</label>
+                                                    <label className="block text-xs font-medium text-gray-500 uppercase">Alley</label>
                                                     <p className="mt-1 text-base font-semibold text-gray-900">{profile.purok || "—"}</p>
                                                 </div>
                                             </div>
@@ -163,7 +163,7 @@ export default function Profile() {
                                         <button 
                                             type="submit" 
                                             disabled={saving} 
-                                            className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 shadow-sm"
+                                            className="w-full sm:w-auto px-6 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 shadow-sm min-h-[44px]"
                                         >
                                             {saving ? "Saving..." : "Update Contact Info"}
                                         </button>

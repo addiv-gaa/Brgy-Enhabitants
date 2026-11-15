@@ -44,7 +44,6 @@ interface SystemSettings {
     barangay_hall_address: string;
     official_contact_email: string;
     official_contact_number: string;
-    barangay_seal_url: string;
     barangay_seal?: File | string | null;
     emergency_hotline: string;
     police_hotline: string;
@@ -64,6 +63,9 @@ interface SystemSettings {
     barangay_province?: string;
     barangay_region?: string;
     number_of_puroks?: string;
+    registered_residents_override?: number | string | null;
+    total_registered_residents?: number;
+    live_residents_count?: number;
     history_text?: string;
     location_geography_text?: string;
     community_culture_text?: string;
@@ -137,7 +139,6 @@ export default function AdminHub() {
         barangay_hall_address: "",
         official_contact_email: "",
         official_contact_number: "",
-        barangay_seal_url: "",
         barangay_seal: null,
         emergency_hotline: "", 
         police_hotline: "", 
@@ -157,6 +158,7 @@ export default function AdminHub() {
         barangay_province: "",
         barangay_region: "",
         number_of_puroks: "",
+        registered_residents_override: "",
         history_text: "",
         location_geography_text: "",
         community_culture_text: "",
@@ -614,36 +616,38 @@ export default function AdminHub() {
                             </div>
                             
                             {/* Modern Segmented Control Tabs */}
-                            <div className="inline-flex bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/50 w-fit">
-                                <button 
-                                    onClick={() => setActiveTab('staff')}
-                                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'staff' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                    Personnel
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('logs')}
-                                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'logs' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                    Audit Logs
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('settings')}
-                                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'settings' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                    Settings
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('faqs')}
-                                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1.5 ${activeTab === 'faqs' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                    <span>AI Knowledge & FAQs</span>
-                                    {faqs.length > 0 && (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'faqs' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
-                                            {faqs.length}
-                                        </span>
-                                    )}
-                                </button>
+                            <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
+                                <div className="inline-flex bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/50 min-w-max">
+                                    <button 
+                                        onClick={() => setActiveTab('staff')}
+                                        className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'staff' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Personnel
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveTab('logs')}
+                                        className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'logs' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Audit Logs
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveTab('settings')}
+                                        className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'settings' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Settings
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveTab('faqs')}
+                                        className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center gap-1.5 ${activeTab === 'faqs' ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        <span>AI Knowledge & FAQs</span>
+                                        {faqs.length > 0 && (
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'faqs' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                                                {faqs.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -683,7 +687,7 @@ export default function AdminHub() {
                                                         onClick={generateRandomPassword}
                                                         className="text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 cursor-pointer"
                                                     >
-                                                        🎲 Auto-Generate
+                                                        Auto-Generate
                                                     </button>
                                                 </div>
                                                 <input 
@@ -707,8 +711,8 @@ export default function AdminHub() {
                                     <div className="px-6 py-5 border-b border-gray-50 flex justify-between items-center bg-white shrink-0">
                                         <h3 className="text-base font-bold text-gray-900">Active Personnel</h3>
                                     </div>
-                                    <div className="overflow-y-auto flex-1">
-                                        <table className="w-full text-sm text-left">
+                                    <div className="overflow-x-auto overflow-y-auto flex-1">
+                                        <table className="w-full text-sm text-left min-w-[550px]">
                                             <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
                                                 <tr>
                                                     <th className="px-6 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-widest border-b border-gray-100">User Details</th>
@@ -800,8 +804,8 @@ export default function AdminHub() {
                                         <input type="text" placeholder="Search by username..." value={logUserFilter} onChange={e => {setLogUserFilter(e.target.value); setLogPage(1);}} className="text-sm border border-gray-200 rounded-md py-1.5 px-3 w-full max-w-xs" />
                                     </div>
                                 </div>
-                                <div className="overflow-y-auto flex-1">
-                                    <table className="w-full text-sm text-left">
+                                <div className="overflow-x-auto overflow-y-auto flex-1">
+                                    <table className="w-full text-sm text-left min-w-[700px]">
                                         <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm">
                                             <tr>
                                                 <th className="px-6 py-3 font-semibold text-gray-500 text-[11px] uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Timestamp</th>
@@ -882,10 +886,6 @@ export default function AdminHub() {
                                                 <div>
                                                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Official Phone Number</label>
                                                     <input type="text" required value={settingsForm.official_contact_number} onChange={(e) => setSettingsForm({...settingsForm, official_contact_number: e.target.value})} className={inputClass} placeholder="09123456789" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Barangay Seal URL</label>
-                                                    <input type="text" value={settingsForm.barangay_seal_url} onChange={(e) => setSettingsForm({...settingsForm, barangay_seal_url: e.target.value})} className={inputClass} placeholder="https://..." />
                                                 </div>
                                             </div>
                                         </div>
@@ -1087,6 +1087,23 @@ export default function AdminHub() {
                                                 <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">City</label><input type="text" value={settingsForm.barangay_city || ""} onChange={(e) => setSettingsForm({...settingsForm, barangay_city: e.target.value})} className={inputClass} placeholder="City of General Trias" /></div>
                                                 <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Province</label><input type="text" value={settingsForm.barangay_province || ""} onChange={(e) => setSettingsForm({...settingsForm, barangay_province: e.target.value})} className={inputClass} placeholder="Cavite" /></div>
                                                 <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Region</label><input type="text" value={settingsForm.barangay_region || ""} onChange={(e) => setSettingsForm({...settingsForm, barangay_region: e.target.value})} className={inputClass} placeholder="IV-A CALABARZON" /></div>
+                                                <div className="col-span-1 md:col-span-2">
+                                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                                        Registered Residents Display Count (Homepage Override)
+                                                    </label>
+                                                    <input 
+                                                        type="number" 
+                                                        min="0"
+                                                        value={settingsForm.registered_residents_override ?? ""} 
+                                                        onChange={(e) => setSettingsForm({...settingsForm, registered_residents_override: e.target.value === '' ? '' : Number(e.target.value)})} 
+                                                        className={inputClass} 
+                                                        placeholder={`Auto-syncing with live Resident Directory (${settingsForm.live_residents_count || 64} approved residents)`} 
+                                                    />
+                                                    <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1.5">
+                                                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                        <span>Leave blank or 0 to auto-sync with the live Resident Directory count (currently: <strong className="text-gray-700">{settingsForm.live_residents_count || 64}</strong> approved residents). Enter a custom number to display an official census population.</span>
+                                                    </p>
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-6">

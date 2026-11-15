@@ -73,7 +73,7 @@ function Form({ route, method }: FormProps) {
         setLoading(true);
         try {
             const res = await api.post('/api/auth/forgot-password/', { email });
-            setUserId(res.data.user_id);
+            if (res.data?.user_id) setUserId(res.data.user_id);
             setStep("forgot_verify");
             setOtpMessage(res.data.message);
             setCountdown(60);
@@ -93,7 +93,7 @@ function Form({ route, method }: FormProps) {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await api.post('/api/auth/reset-password/', { user_id: userId, otp, new_password: newPassword });
+            const res = await api.post('/api/auth/reset-password/', { email, user_id: userId, otp, new_password: newPassword });
             const recoveredUsername = res.data?.username || "";
             setDialogModal({
                 title: "Password Changed Successfully",
@@ -129,7 +129,7 @@ function Form({ route, method }: FormProps) {
         try {
             if (method === "login") {
                 const res = await api.post(route, { username, password });
-                // F-029: Store tokens in sessionStorage for Bearer auth on Safari/iOS
+                // F-029: Store tokens in sessionStorage for Bearer fallback on Safari/iOS
                 if (res.data?.access) {
                     sessionStorage.setItem("access_token", res.data.access);
                 }
@@ -140,9 +140,6 @@ function Form({ route, method }: FormProps) {
                 navigate("/");
             } else {
                 const res = await api.post('/api/auth/register/', { username, email, password });
-                
-                // DEBUG: Print exactly what Django sent back to your browser console (F12)
-                console.log("Django Registration Response:", res.data); 
                 
                 // NEW: Failsafe check for user_id or id
                 const newUserId = res.data.user_id || res.data.id; 
@@ -239,7 +236,7 @@ function Form({ route, method }: FormProps) {
     };
 
     return (
-        <div className="flex bg-gray-100 min-h-screen flex-col justify-center px-6 py-12 lg:px-8">
+        <div className="flex bg-gray-100 min-h-[100dvh] flex-col justify-center px-4 sm:px-6 py-8 sm:py-12 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-sm">
                 <img
                     alt="Barangay Logo"
@@ -327,7 +324,7 @@ function Form({ route, method }: FormProps) {
 
                         {/* SUBMIT BUTTON */}
                         <div>
-                            <button type="submit" disabled={loading} className="flex w-full justify-center rounded-md bg-green-500 px-3 py-1.5 text-sm/6 font-semibold text-white hover:bg-green-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button type="submit" disabled={loading} className="flex w-full justify-center items-center min-h-[44px] rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors">
                                 {loading ? "Please wait..." : name}
                             </button>
                         </div>

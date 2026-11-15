@@ -268,7 +268,7 @@ export default function DashboardAdminView() {
     return (
         <div className="flex flex-col gap-8 w-full pb-8">
             {/* TOP: Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard 
                     title="Total Residents" 
                     value={stats.total_residents.toLocaleString()} 
@@ -363,7 +363,7 @@ export default function DashboardAdminView() {
                                     onChange={e => { setPurokFilter(e.target.value); setPage(1); }}
                                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                                 >
-                                    <option value="">All Puroks</option>
+                                    <option value="">All Alleys</option>
                                     {stats.charts.purok?.map((p: any) => (
                                         <option key={p.name} value={p.name}>{p.name}</option>
                                     ))}
@@ -397,7 +397,7 @@ export default function DashboardAdminView() {
                             <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-3">Name</th>
-                                    <th className="px-6 py-3">Purok</th>
+                                    <th className="px-6 py-3">Alley</th>
                                     <th className="px-6 py-3">Sex</th>
                                     <th className="px-6 py-3">Age Group</th>
                                     {activeFilter === 'vulnerable' && <th className="px-6 py-3">Sectors</th>}
@@ -448,10 +448,10 @@ export default function DashboardAdminView() {
                 {/* ROW 1: 3 Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* 1. Population by Gender */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
                         <h2 className="text-sm font-bold text-gray-800 mb-4">Population by Gender</h2>
                         <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start h-auto sm:h-64">
-                            <div className="w-full sm:w-1/2 h-48 sm:h-full relative shrink-0">
+                            <div className="w-full sm:w-1/2 h-48 sm:h-full min-h-[190px] relative shrink-0">
                                 <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                     <PieChart>
                                         <Pie data={stats.charts.gender} innerRadius="55%" outerRadius="80%" paddingAngle={2} dataKey="value" stroke="none" isAnimationActive={false}>
@@ -482,7 +482,7 @@ export default function DashboardAdminView() {
                     </div>
 
                     {/* 2. Resident AI Activity (Area Chart) */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex flex-wrap gap-2 justify-between items-center mb-6">
                             <h2 className="text-sm font-bold text-gray-800">AI Activity ({currentYear})</h2>
                             <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">
@@ -503,7 +503,7 @@ export default function DashboardAdminView() {
                     </div>
 
                     {/* 3. Welfare Coverage (Vulnerable Sectors) */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                             <h2 className="text-sm font-bold text-gray-800">Vulnerable Sectors</h2>
                             <div className="flex gap-1.5 flex-wrap justify-end">
@@ -587,9 +587,9 @@ export default function DashboardAdminView() {
 
                 {/* ROW 3: Bar & Pyramid Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* 6. Purok Distribution (Dashboard specific) */}
+                    {/* 6. Alley Distribution (Dashboard specific) */}
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                        <h2 className="text-sm font-bold text-gray-800 mb-4 text-center">Population by Purok</h2>
+                        <h2 className="text-sm font-bold text-gray-800 mb-4 text-center">Population by Alley</h2>
                         <div className="h-[420px]">
                             <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                 <BarChart layout="vertical" data={stats.charts.purok} margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
@@ -609,10 +609,10 @@ export default function DashboardAdminView() {
                         <h2 className="text-sm font-bold text-gray-800 mb-4 text-center">Age Distribution</h2>
                         <div className="h-[420px]">
                             <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                <BarChart layout="vertical" data={pyramidData} stackOffset="sign" margin={{ top: 0, right: 40, left: 40, bottom: 0 }}>
+                                <BarChart layout="vertical" data={pyramidData} stackOffset="sign" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke="#f3f4f6" />
                                     <XAxis type="number" domain={([dataMin, dataMax]: any) => { const max = Math.max(Math.abs(dataMin || 0), Math.abs(dataMax || 0)); const pad = max + Math.max(1, Math.ceil(max * 0.2)); return [-pad, pad]; }} tickFormatter={(v) => stats.total_residents ? ((Math.abs(v) / stats.total_residents) * 100).toFixed(1) + '%' : '0%'} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                                    <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} width={140} interval={0} />
+                                    <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} width={110} interval={0} />
                                     <Tooltip cursor={{ fill: '#f9fafb' }} formatter={(value: any, name: any) => [Math.abs(value), name === 'MalePlot' ? 'Male' : 'Female']} />
                                     <Legend wrapperStyle={{ fontSize: '12px' }} formatter={(value) => value === 'MalePlot' ? 'Male' : 'Female'} />
                                     <ReferenceLine x={0} stroke="#9ca3af" />

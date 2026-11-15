@@ -35,17 +35,17 @@ export default function HouseholdModal({ mode, household, coords, onClose, onSav
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-up">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-3 sm:p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden animate-fade-in-up">
                 
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-                    <h2 className="text-xl font-bold text-gray-900">
+                <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                         {mode === 'add' ? 'Map New Household Structure' : 'Edit Structure Details'}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
                 
-                <form className="p-6 space-y-5" onSubmit={handleSubmit}>
+                <form className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1" onSubmit={handleSubmit}>
                     
                     {/* Coordinates Display (Read Only) */}
                     <div className="bg-green-50 p-3 rounded-lg border border-green-100 flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function HouseholdModal({ mode, household, coords, onClose, onSav
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Housing Status</label>
                             <select 

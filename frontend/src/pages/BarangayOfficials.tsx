@@ -365,8 +365,8 @@ export default function BarangayOfficials() {
 
     const renderCard = (o: BarangayOfficial) => {
         return (
-            <div key={o.id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center shadow-sm relative group transition-all hover:shadow-md hover:border-green-200">
-                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mr-5 overflow-hidden shrink-0 border-2 border-gray-100 shadow-inner">
+            <div key={o.id} className="bg-white rounded-xl border border-gray-200 p-3.5 sm:p-5 flex items-center shadow-sm relative group transition-all hover:shadow-md hover:border-green-200">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center mr-3.5 sm:mr-5 overflow-hidden shrink-0 border-2 border-gray-100 shadow-inner">
                     {o.image ? (
                         <img src={getImageUrl(o.image) || ''} alt={o.name} className="w-full h-full object-cover" />
                     ) : (
@@ -385,7 +385,7 @@ export default function BarangayOfficials() {
                 </div>
                 
                 {canEdit && (
-                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-md shadow-sm border border-gray-200 p-1 flex gap-1">
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-md shadow-sm border border-gray-200 p-1 flex gap-1">
                         <button onClick={() => openModal(o)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
                             <Pencil className="w-3.5 h-3.5" />
                         </button>

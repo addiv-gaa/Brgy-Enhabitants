@@ -276,7 +276,7 @@ export default function Documents() {
 
                         {/* Search and Filters */}
                         <div className="bg-white p-4 rounded-t-lg border border-gray-200 border-b-0 flex flex-col sm:flex-row gap-4 shadow-sm items-center justify-between">
-                            <div className="flex w-full gap-4">
+                            <div className="flex flex-col sm:flex-row w-full gap-2 sm:gap-4">
                                 <div className="relative flex-1 max-w-md">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><SearchIcon /></div>
                                     <input 
@@ -287,7 +287,7 @@ export default function Documents() {
                                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-600 sm:text-sm"
                                     />
                                 </div>
-                                <div className="w-full sm:w-48">
+                                <div className="w-full sm:w-48 shrink-0">
                                     <select 
                                         value={filterType} 
                                         onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
@@ -314,7 +314,7 @@ export default function Documents() {
                         {/* Data Table */}
                         <div className="bg-white border border-gray-200 rounded-b-lg shadow-sm overflow-hidden flex flex-col min-h-[500px]">
                             <div className="overflow-x-auto flex-1">
-                                <table className="min-w-full divide-y divide-gray-200">
+                                <table className="min-w-full min-w-[650px] divide-y divide-gray-200">
                                     <thead className="bg-gray-50 select-none">
                                         <tr>
                                             <th className="px-6 py-3 text-left w-10">

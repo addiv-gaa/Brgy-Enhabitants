@@ -37,7 +37,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             
         token['role'] = role 
         
-        print(f"DEBUG: Generating token for {user.username} with role: {role}")
+        import logging
+        logging.getLogger(__name__).debug("Generating token for %s with role: %s", user.username, role)
         return token
 
 class UserSerializer(serializers.ModelSerializer):
@@ -76,6 +77,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'author_name'
         ]
         read_only_fields = ['author', 'created_at']
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if data.get('attachment') in ['', 'null']:
+            data['attachment'] = None
+        if data.get('linked_event') in ['', 'null']:
+            data['linked_event'] = None
+        return super().to_internal_value(data)
 
     def get_is_read(self, obj):
         user = self.context['request'].user
@@ -221,9 +230,21 @@ class OfficialDocumentSerializer(serializers.ModelSerializer):
         return None
 
 class BarangaySettingsSerializer(serializers.ModelSerializer):
+    total_registered_residents = serializers.SerializerMethodField()
+    live_residents_count = serializers.SerializerMethodField()
+
     class Meta:
         model = BarangaySettings
         fields = '__all__'
+
+    def get_live_residents_count(self, obj):
+        from .models import Resident
+        return Resident.objects.filter(is_approved=True).count()
+
+    def get_total_registered_residents(self, obj):
+        if obj.registered_residents_override and obj.registered_residents_override > 0:
+            return obj.registered_residents_override
+        return self.get_live_residents_count(obj)
 
 class EmergencyContactSerializer(serializers.ModelSerializer):
     class Meta:

@@ -64,7 +64,7 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
                     type="button"
                     tabIndex={0}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`w-[calc(100%-1.5rem)] text-left cursor-pointer px-4 py-2.5 mx-3 mb-1 rounded-md transition-all text-sm flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2 focus:ring-offset-[#1e7b2b] ${
+                    className={`w-[calc(100%-1.5rem)] text-left cursor-pointer px-4 py-2.5 mx-3 mb-1 rounded-md transition-all text-sm flex items-center justify-between min-h-[44px] focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2 focus:ring-offset-[#1e7b2b] ${
                         isActive ? 'bg-[#44934e] text-white font-semibold' : 'text-green-100 hover:bg-[#2e8f3b]'
                     }`}
                     onClick={() => navigate(item.path)}
@@ -88,7 +88,7 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
     };
 
     return (
-        <div className={`h-screen bg-[#1e7b2b] text-white flex flex-col shrink-0 shadow-[4px_0_15px_rgba(0,0,0,0.1)] transition-[width] duration-300 relative overflow-hidden will-change-[width] transform-gpu ${
+        <div className={`h-[100dvh] bg-[#1e7b2b] text-white flex flex-col shrink-0 shadow-[4px_0_15px_rgba(0,0,0,0.1)] transition-[width] duration-300 relative overflow-hidden will-change-[width] transform-gpu ${
             isOpen ? 'w-64' : 'w-0'
         }`}>
             {/* Background watermark */}

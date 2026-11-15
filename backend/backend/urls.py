@@ -12,6 +12,7 @@ from api.views import (
     CustomTokenRefreshView,
     LogoutView,
     CurrentUserView,
+    GetCSRFTokenView,
     CreateUserView,
     RegisterWithEmailView,
     VerifyEmailOTPView,
@@ -65,6 +66,7 @@ urlpatterns = [
     path('api/auth/register/', RegisterWithEmailView.as_view(), name='register_email'),
     path('api/auth/verify-otp/', VerifyEmailOTPView.as_view(), name='verify_otp'),
     path('api/auth/resend-otp/', ResendOTPView.as_view(), name='resend_otp'),
+    path('api/auth/csrf/', GetCSRFTokenView.as_view(), name='csrf_token'),
     path('api/auth/me/', CurrentUserView.as_view(), name='current_user'),
     path('api/auth/logout/', LogoutView.as_view(), name='logout'),
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
@@ -103,3 +105,10 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
 ]
+
+
+# Production Generic Error Handlers (F-004)
+handler400 = 'api.views.custom_bad_request'
+handler403 = 'api.views.custom_permission_denied'
+handler404 = 'api.views.custom_not_found'
+handler500 = 'api.views.custom_server_error'

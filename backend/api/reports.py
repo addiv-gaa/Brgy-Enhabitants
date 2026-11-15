@@ -55,12 +55,10 @@ def get_rbi_form_c_data():
         years = 0
         bdate = r['birth_date']
         if bdate:
-            years = today.year - bdate.year
-            months = years * 12 + today.month - bdate.month
+            months = (today.year - bdate.year) * 12 + today.month - bdate.month
             if today.day < bdate.day:
                 months -= 1
-                if months % 12 == 11: # We dropped below a year boundary
-                    years -= 1
+            years = months // 12
         
         # Age Brackets Mapping
         bracket = None
@@ -304,9 +302,10 @@ class RBIFormCDownloadView(APIView):
 
         try:
             period = data.get('metadata', {}).get('semestral_period') or "Semestral"
-            timestamp_str = timezone.now().strftime("%Y%m%d_%H%M%S")
+            local_now = timezone.localtime()
+            timestamp_str = local_now.strftime("%Y%m%d_%H%M%S")
             filename = f"RBI_Form_C_{timestamp_str}.xlsx"
-            display_time = timezone.now().strftime("%b %d, %Y %I:%M %p")
+            display_time = local_now.strftime("%b %d, %Y %I:%M %p")
             doc_title = f"RBI Form C Semestral Report ({period}) - Generated {display_time}"
             uploader = request.user if request.user.is_authenticated else None
 

@@ -15,7 +15,7 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='otp_profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='RESIDENT') # New Role Field
-    email_otp = models.CharField(max_length=6, blank=True, null=True)
+    email_otp = models.CharField(max_length=128, blank=True, null=True)
     otp_created_at = models.DateTimeField(blank=True, null=True)
     otp_attempts = models.IntegerField(default=0)
     must_change_password = models.BooleanField(default=False)
@@ -258,7 +258,6 @@ class BarangaySettings(models.Model):
     barangay_hall_address = models.CharField(max_length=255, default="Barangay Hall, Main St.")
     official_contact_email = models.EmailField(default="official@magsaysay.gov.ph")
     official_contact_number = models.CharField(max_length=50, default="09123456789")
-    barangay_seal_url = models.CharField(max_length=500, blank=True, null=True)
     barangay_seal = models.ImageField(upload_to='settings/', blank=True, null=True)
 
     # Emergency Hotlines
@@ -280,6 +279,7 @@ class BarangaySettings(models.Model):
     barangay_province = models.CharField(max_length=100, default="Cavite")
     barangay_region = models.CharField(max_length=100, default="IV-A CALABARZON")
     number_of_puroks = models.CharField(max_length=50, default="4 Puroks")
+    registered_residents_override = models.PositiveIntegerField(null=True, blank=True, default=None, help_text="Custom population override for homepage display. If left blank or 0, live approved resident count is used.")
     
     history_text = models.TextField(default="Barangay San Gabriel is one of the barangays comprising the City...")
     location_geography_text = models.TextField(default="Situated within the city...")
